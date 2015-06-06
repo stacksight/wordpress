@@ -144,15 +144,39 @@ class WPStackSightPlugin {
             $data['data']['description'] = $args['object_type'] .' (' . $args['object_subtype'] . ') - '. $args['object_name'] .' has been '. $args['action'];
         }
 
+        error_log($args['object_type']);
         switch ($args['object_type']) {
             case 'Post':
                 $data['design']['icon'] = 'fa-file-text';
                 $data['design']['color'] = '#8FD5FF';
                 break;
-            
+            case 'User':
+               $data['design']['icon'] = 'fa-user';
+               $data['design']['color'] = '#8664aa';
+                break;
+            case 'Comments':
+               $data['design']['icon'] = 'fa-comment';
+               $data['design']['color'] = '#99b5bc';
+                break;
+            case 'Menu':
+               $data['design']['icon'] = 'fa-bars';
+               $data['design']['color'] = '#fd8e00';
+                break;
+            case 'Taxonomy':
+               $data['design']['icon'] = 'fa-pie-chart';
+               $data['design']['color'] = '#de1b16';
+                break;
+            case 'Attachment':
+               $data['design']['icon'] = 'fa-paperclip';
+               $data['design']['color'] = '#92c54c';
+                break;
+            case 'Options':
+               $data['design']['icon'] = 'fa-cog';
+               $data['design']['color'] = '#fbe939';
+                break;
             default:
-                $data['design']['color'] = '#8FD5FF';
-                $data['design']['icon'] = 'fa-bell';
+                $data['design']['color'] = '#19617a';
+                $data['design']['icon'] = 'fa-bars';
                 break;
         }
 
