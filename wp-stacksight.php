@@ -11,96 +11,7 @@
 
 defined('ABSPATH') or die("No script kiddies please!");
 
-require('stacksight-php-sdk/class-stacksight-base.php');
-require('stacksight-php-sdk/interface-stacksight.php');
-
-function b_error_log($message, $level = 'info') {
-    if (!$message) return;
-
-    $log_file = __DIR__.'/'.$level.'.log';
-    // удалить лог если он превышает $logfile_limit
-    $logfile_limit = 1024000; // размер лог файла в килобайтах (102400 = 100 мб)
-    if (file_exists($log_file) && filesize($log_file) / 1024 > $logfile_limit) unlink($log_file);
-    
-    // $date = new Datetime(null, new DateTimeZone('Europe/Minsk'));
-    $date = new Datetime();
-    $date_format = $date->format('d.m.Y H:i:s');
-    error_log($date_format .' '. $message."\n", 3, $log_file);
-}
-
-class WPStackSight extends StackSightBase implements iStacksight {
-
-    public function initApp($name, $token) {
-        if (!$name || !$token) return array('success' => false, 'message' => 'Empty name or token');
-
-        $result = array();
-
-        $response = wp_remote_post(WPStackSight::INIT_APP_ENDPOINT_01, array(
-            'method' => 'POST',
-            'timeout' => 45,
-            'redirection' => 0,
-            'httpversion' => '1.1',
-            'blocking' => true,
-            'headers' => array(
-                'Content-Type' => 'application/x-www-form-urlencoded',
-                'authorization' => $token
-            ),
-            'body' => array(
-                'name' => urlencode($name)
-            )
-        ));
-
-        if (is_wp_error($response)) {
-           $error_message = $response->get_error_message();
-           $result['message'] = "initApp: something went wrong: $error_message";
-           $result['success'] = false;
-        } else {
-            if ($response['response']['code'] == 200) {
-                $result['data'] = json_decode($response['body'], true);
-                $result['message'] = 'OK';
-                $result['success'] = true;
-            } else {
-                $result['message'] = "initApp: something went wrong: ".$response['body'];
-                $result['success'] = false;
-            }
-        }
-
-        return $result;
-    }
-
-    public function publishEvent($data) {
-        $result = array();
-
-        $response = wp_remote_post(WPStackSight::EVENTS_ENDPOINT_01, array(
-            'method' => 'POST',
-            'timeout' => 45,
-            'redirection' => 0,
-            'httpversion' => '1.1',
-            'blocking' => true,
-            'headers' => array(
-                'Content-Type' => 'application/json'
-            ),
-            'body' => json_encode($data)
-        ));
-
-        if (is_wp_error($response)) {
-           $error_message = $response->get_error_message();
-           $result['message'] = "publishEvent: something went wrong: $error_message";
-           $result['success'] = false;
-        } else {
-            if ($response['response']['code'] == 200) {
-                $result['message'] = 'OK';
-                $result['success'] = true;
-            } else {
-                $result['message'] = "publishEvent: something went wrong: ".$response['body'];
-                $result['success'] = false;
-            }
-        }
-
-        return $result;
-    }
-
-}
+require('stacksight-php-sdk/cms/wordpress.php');
 
 class WPStackSightPlugin {
 
@@ -123,7 +34,7 @@ class WPStackSightPlugin {
     }
 
     public function insert_log_mean($args) {
-        b_error_log('insert_log_mean: '.print_r($args, true));
+        $this->wp_stack_sight->error_log('insert_log_mean: '.print_r($args, true));
 
         $app = get_option('stack_sight_app');
         $this->options = get_option('stacksight_opt');
