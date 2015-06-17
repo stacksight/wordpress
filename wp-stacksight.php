@@ -11,7 +11,7 @@
 
 defined('ABSPATH') or die("No script kiddies please!");
 
-require('stacksight-php-sdk/cms/wordpress.php');
+require('stacksight-php-sdk/platforms/wordpress.php');
 
 class WPStackSightPlugin {
 
@@ -34,8 +34,6 @@ class WPStackSightPlugin {
     }
 
     public function insert_log_mean($args) {
-        $this->wp_stack_sight->error_log('insert_log_mean: '.print_r($args, true));
-
         $app = get_option('stack_sight_app');
         $this->options = get_option('stacksight_opt');
         $data = array();
@@ -55,7 +53,6 @@ class WPStackSightPlugin {
             $data['data']['description'] = $args['object_type'] .' (' . $args['object_subtype'] . ') - '. $args['object_name'] .' has been '. $args['action'];
         }
 
-        error_log($args['object_type']);
         switch ($args['object_type']) {
             case 'Post':
                 $data['design']['icon'] = 'fa-file-text';
@@ -116,7 +113,6 @@ class WPStackSightPlugin {
         ?>
         <div class="wrap">
             <h2>App setting for StackSight</h2>
-            <!--<pre><?php //print_r(get_option('stack_sight_app')); ?></pre>-->
             <form method="post" action="options.php">
             <?php
                 // This prints out all hidden setting fields
