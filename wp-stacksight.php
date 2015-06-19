@@ -11,16 +11,14 @@
 
 defined('ABSPATH') or die("No script kiddies please!");
 
-require('stacksight-php-sdk/platforms/wordpress.php');
+require('stacksight-php-sdk/platforms/SSWordpressClient.php');
 
 class WPStackSightPlugin {
 
-    public $wp_stack_sight;
+    public $stacksight_client;
     private $options;
 
     public function __construct() {
-        $this->wp_stack_sight = new WPStackSight();
-
         register_activation_hook( __FILE__, array(__CLASS__, 'install'));
         register_deactivation_hook( __FILE__, array(__CLASS__, 'uninstall'));
 
@@ -30,23 +28,20 @@ class WPStackSightPlugin {
             add_action('admin_notices', array($this, 'show_errors'));
         }
 
-        add_action('aal_insert_log', array(&$this, 'insert_log_mean'), 30);
+        $this->options = get_option('stacksight_opt');
+        if ($this->options) {
+            $this->stacksight_client = new SSWordpressClient($this->options['token'], 'wordpress');
+            $app = $this->stacksight_client->initApp($this->options['app_name']);
+            if ($app['success']) add_action('aal_insert_log', array(&$this, 'insert_log_mean'), 30);
+            else SSUtilities::error_log($app['message'], 'error');
+        }
     }
 
     public function insert_log_mean($args) {
-        $app = get_option('stack_sight_app');
-        $this->options = get_option('stacksight_opt');
         $data = array();
-        $mct = explode(" ", microtime());
-        if (!$app) return;
-
-        $data['index'] = 'events';
-        $data['type'] = 'events';
         $data['key'] = $args['object_type'];
         $data['name'] = $args['action'];
         $data['token'] = $this->options['token'];
-        $data['created'] = date("Y-m-d\TH:i:s",$mct[1]).substr((string)$mct[0],1,4).'Z';
-        $data['appId'] = $app['_id'];
         if (!$args['object_subtype']) {
             $data['data']['description'] = $args['object_type'] .' (' . $args['object_subtype'] .' has been '. $args['action'];
         } else {
@@ -88,7 +83,8 @@ class WPStackSightPlugin {
                 break;
         }
 
-        $res = $this->wp_stack_sight->publishEvent($data);
+        $res = $this->stacksight_client->publishEvent($data);
+        if (!$res['success']) SSUtilities::error_log($res['message'], 'error');
     }
 
     /**
@@ -165,9 +161,6 @@ class WPStackSightPlugin {
      */
     public function sanitize($input) {
         $new_input = array();
-        $app = get_option('stack_sight_app');
-        $this->options = get_option('stacksight_opt');
-
 
         if(!$input['app_name']) add_settings_error('app_name', 'app_name', '"App Name" can not be empty');
         if(!$input['token']) add_settings_error('token', 'token', '"App Acces Token" can not be empty');
@@ -175,19 +168,16 @@ class WPStackSightPlugin {
 
         $any_errors = $this->any_form_errors();
         // if there are errors or name or token changed - reinit app
-        if (!$any_errors && (!$app || $this->options['app_name'] != $input['app_name'] || $this->options['token'] != $input['token'])) {
-            $res = $this->wp_stack_sight->initApp($input['app_name'], $input['token']);
-
-            if ($res['success']) {
-                update_option('stack_sight_app', $res['data']);
-                add_settings_error('app_name', 'app_name', 'App "'.$res['data']['name'].'" created successfully', 'updated');
+        if (!$any_errors) {
+            $app = $this->stacksight_client->initApp($input['app_name']);
+            
+            if ($app['success']) {
+                if ($app['message'] != 'LOADED') add_settings_error('app_name', 'app_name', 'The app "'.$app['data']['name'].'" created successfully', 'updated');
             } else {
-                add_settings_error('app_name', 'app_name', $res['message']);
-                add_settings_error('token', 'token', $res['message']);
+                add_settings_error('', '', $app['message']);
             }
         }
 
-        if ($any_errors) update_option('stack_sight_app', '');
         $new_input['app_name'] = $input['app_name'];
         $new_input['token'] = $input['token'];
         return $new_input;
@@ -231,18 +221,14 @@ class WPStackSightPlugin {
     }
 
     public static function install() {
-        update_option('stack_sight_token', '');
-        update_option('stack_sight_name', '');
-        update_option('stack_sight_app', '');
+        update_option('stacksight', '');
     }
 
     public static function uninstall() {
-        delete_option('stack_sight_token');
-        delete_option('stack_sight_name');
-        delete_option('stack_sight_app');
+        delete_option('stacksight');
         delete_option('stacksight_opt');
     }
 
 }
 
-$wp_stack_sight_plugin = new WPStackSightPlugin();
+$stacksight_client_plugin = new WPStackSightPlugin();
