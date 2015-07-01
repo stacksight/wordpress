@@ -12,6 +12,7 @@
 defined('ABSPATH') or die("No script kiddies please!");
 
 require('stacksight-php-sdk/platforms/SSWordpressClient.php');
+require('stacksight-php-sdk/SSLogsTracker.php');
 
 class WPStackSightPlugin {
 
@@ -32,7 +33,10 @@ class WPStackSightPlugin {
         if ($this->options) {
             $this->stacksight_client = new SSWordpressClient($this->options['token'], 'wordpress');
             $app = $this->stacksight_client->initApp($this->options['app_name']);
-            if ($app['success']) add_action('aal_insert_log', array(&$this, 'insert_log_mean'), 30);
+            if ($app['success']) {
+                add_action('aal_insert_log', array(&$this, 'insert_log_mean'), 30);
+                new SSLogsTracker($this->stacksight_client, 'wordpress');
+            }
             else SSUtilities::error_log($app['message'], 'error');
         }
     }
