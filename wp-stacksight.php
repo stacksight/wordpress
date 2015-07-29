@@ -49,7 +49,30 @@ class WPStackSightPlugin {
         if (!$args['object_subtype']) {
             $data['data']['description'] = $args['object_type'] .' (' . $args['object_subtype'] .' has been '. $args['action'];
         } else {
-            $data['data']['description'] = $args['object_type'] .' (' . $args['object_subtype'] . ') - '. $args['object_name'] .' has been '. $args['action'];
+
+            switch ($args['object_subtype']) {
+                case 'attachment':
+                    $img_orig = wp_get_attachment_image_src($args['object_id'], 'full');
+                    if ($img_orig) {
+                        $img_orig_ex = pathinfo($img_orig[0]);
+                        $file = get_attached_file($args['object_id']);
+                        $file_ex = pathinfo($file);
+                        $image = wp_get_image_editor($file);
+                        if ( ! is_wp_error( $image ) ) {
+                            $image->resize(100, 100, true);
+                            $image->save($file_ex['dirname'].'/ss-thumb-'.$file_ex['basename']);
+                            $ss_thumb_url = $img_orig_ex['dirname'].'/ss-thumb-'.$img_orig_ex['basename'];
+                            $img = '<img src="'.$ss_thumb_url.'"/>';
+                        }
+                    }
+                    
+                    if (!$img) $data['data']['description'] = $args['object_type'] .' (' . $args['object_subtype'] . ') - '. $args['object_name'] .' has been '. $args['action'];
+                    else $data['data']['description'] = $args['object_type'] .' (image) '. $img .' has been '. $args['action'];
+                    break;
+                default:
+                    $data['data']['description'] = $args['object_type'] .' (' . $args['object_subtype'] . ') - '. $args['object_name'] .' has been '. $args['action'];
+                    break;
+            }
         }
 
         switch ($args['object_type']) {
@@ -119,6 +142,7 @@ class WPStackSightPlugin {
                 settings_fields( 'stacksight_option_group' );   
                 do_settings_sections( 'stacksight-set-admin' );
                 $ss_app = get_option('stacksight');
+                // echo '<pre>'.print_r(, true).'</pre>';
                 // trigger_error('test', E_USER_ERROR);
                 if ($ss_app) printf("<p>App ID: <strong>%s</strong></p>", $ss_app['_id']);
                 submit_button(); 
