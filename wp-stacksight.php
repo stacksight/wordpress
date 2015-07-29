@@ -118,6 +118,9 @@ class WPStackSightPlugin {
                 // This prints out all hidden setting fields
                 settings_fields( 'stacksight_option_group' );   
                 do_settings_sections( 'stacksight-set-admin' );
+                $ss_app = get_option('stacksight');
+                // trigger_error('test', E_USER_ERROR);
+                if ($ss_app) printf("<p>App ID: <strong>%s</strong></p>", $ss_app['_id']);
                 submit_button(); 
             ?>
             </form>
