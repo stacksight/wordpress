@@ -200,6 +200,7 @@ class WPStackSightPlugin {
         $any_errors = $this->any_form_errors();
         // if there are errors or name or token changed - reinit app
         if (!$any_errors) {
+            if (!$this->stacksight_client) $this->stacksight_client = new SSWordpressClient($input['token'], 'wordpress');
             $app = $this->stacksight_client->initApp($input['app_name']);
             
             if ($app['success']) {
