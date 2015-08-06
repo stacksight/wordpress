@@ -11,8 +11,10 @@
 
 defined('ABSPATH') or die("No script kiddies please!");
 
-require('stacksight-php-sdk/platforms/SSWordpressClient.php');
-require('stacksight-php-sdk/SSLogsTracker.php');
+require_once('stacksight-php-sdk/SSUtilities.php');
+require_once('stacksight-php-sdk/SSClientBase.php');
+require_once('stacksight-php-sdk/SSHttpRequest.php');
+require_once('stacksight-php-sdk/platforms/SSWordpressClient.php');
 
 class WPStackSightPlugin {
 
@@ -29,15 +31,10 @@ class WPStackSightPlugin {
             add_action('admin_notices', array($this, 'show_errors'));
         }
 
-        $this->options = get_option('stacksight_opt');
-        if ($this->options) {
-            $this->stacksight_client = new SSWordpressClient($this->options['token'], 'wordpress');
-            $app = $this->stacksight_client->initApp($this->options['app_name']);
-            if ($app['success']) {
-                add_action('aal_insert_log', array(&$this, 'insert_log_mean'), 30);
-                new SSLogsTracker($this->stacksight_client, 'wordpress');
-            }
-            else SSUtilities::error_log($app['message'], 'error');
+        if (defined('STACKSIGHT_APP_ID') && defined('STACKSIGHT_TOKEN') && defined('STACKSIGHT_BOOTSTRAPED')) {
+            $this->stacksight_client = new SSWordpressClient(STACKSIGHT_TOKEN, 'wordpress');
+            $this->stacksight_client->initApp(STACKSIGHT_APP_ID);
+            add_action('aal_insert_log', array(&$this, 'insert_log_mean'), 30);
         }
     }
 
@@ -134,7 +131,7 @@ class WPStackSightPlugin {
      */
     public function create_admin_page() {
         ?>
-        <div class="wrap">
+        <div class="ss-wrap">
             <h2>App setting for StackSight</h2>
             <form method="post" action="options.php">
             <?php
@@ -144,9 +141,49 @@ class WPStackSightPlugin {
                 $ss_app = get_option('stacksight');
                 // echo '<pre>'.print_r(, true).'</pre>';
                 // trigger_error('test', E_USER_ERROR);
-                if ($ss_app) printf("<p>App ID: <strong>%s</strong></p>", $ss_app['_id']);
-                submit_button(); 
             ?>
+<?php if ($ss_app): ?>
+    <style type="text/css">
+        .code-red {color: #cc3366;}
+        .code-yellow {color: #999966;}
+        .code-blue {color: #6600cc;}
+        .code-comments {color: #777;}
+        .code-ss-inlcude {font-weight: bold; }
+        .ss-diagnostic-block ul {color: red;list-style-type: disc; margin-left: 25px;}
+        .ss-diagnostic-block .ss-ok {color: green;}
+    </style>
+
+    <div class="ss-config-block">
+    <p><?php echo __("Copy a configuration code (start-end block) and modify your wp-config.php file like shown below") ?>:</p>
+<pre class="code-ss-inlcude">
+<span class="code-comments">// StackSight start config</span>
+<span class="code-red">define</span>(<span class="code-yellow">'STACKSIGHT_APP_ID'</span>, <span class="code-yellow">'<?php echo $ss_app['_id'] ?>'</span>);
+<span class="code-red">define</span>(<span class="code-yellow">'STACKSIGHT_TOKEN'</span>, <span class="code-yellow">'<?php echo $ss_app['token'] ?>'</span>);
+<span class="code-red">require_once</span>(<span class="code-blue">ABSPATH</span> . <span class="code-yellow">'/<?php echo $this->getRelativeRootPath(); ?>'</span> . <span class="code-yellow">'stacksight-php-sdk/bootstrap-wp.php'</span>);
+<span class="code-comments">// StackSight end config</span>
+
+<span class="code-comments">// insert previous code block before this line (do not copy the following lines)</span>
+<span class="code-comments">/** Sets up WordPress vars and included files. */</span>
+<span class="code-red">require_once</span>(<span class="code-blue">ABSPATH</span> . <span class="code-yellow">'wp-settings.php'</span>);
+</pre>
+    </div>
+        
+    <div class="ss-diagnostic-block">
+        <h3><?php echo __('wp-config.php status', 'stacksight') ?></h3>
+        <ul class="ss-config-diagnostic">
+            <?php if ($diagnostic = $this->getDiagnostic($ss_app)): ?>
+                <?php foreach ($diagnostic as $d_item): ?>
+                    <li><?php echo $d_item ?></li>
+                <?php endforeach ?>
+            <?php else: ?>
+                <h4 class="ss-ok">OK</h4>
+            <?php endif ?>
+        </ul>
+    </div>
+
+<?php endif ?>
+
+            <?php submit_button(); ?>
             </form>
         </div>
         <?php
@@ -201,12 +238,12 @@ class WPStackSightPlugin {
         // if there are errors or name or token changed - reinit app
         if (!$any_errors) {
             if (!$this->stacksight_client) $this->stacksight_client = new SSWordpressClient($input['token'], 'wordpress');
-            $app = $this->stacksight_client->initApp($input['app_name']);
+            $res = $this->stacksight_client->createApp($input['app_name']);
             
-            if ($app['success']) {
-                if ($app['message'] != 'LOADED') add_settings_error('app_name', 'app_name', 'The app "'.$app['data']['name'].'" created successfully', 'updated');
+            if ($res['success']) {
+                if ($res['new']) add_settings_error('app_name', 'app_name', 'The app "'.$res['data']['name'].'" created successfully', 'updated');
             } else {
-                add_settings_error('', '', $app['message']);
+                add_settings_error('', '', $res['message']);
             }
         }
 
@@ -259,6 +296,35 @@ class WPStackSightPlugin {
     public static function uninstall() {
         delete_option('stacksight');
         delete_option('stacksight_opt');
+    }
+
+    public function getRelativeRootPath() {
+        $plg_dir = plugin_dir_path( __FILE__ );
+        if (strpos($plg_dir, ABSPATH) === FALSE) return;
+
+        return substr($plg_dir, strlen(ABSPATH));
+    }
+
+    public function getDiagnostic($app) {
+        $list = array();
+
+        if (!defined('STACKSIGHT_APP_ID')) {
+            $list[] = __("App Id is not defined", 'stacksight');
+        } elseif (STACKSIGHT_APP_ID != $app['_id']) {
+            $list[] = __("App Ids do not match", 'stacksight');
+        }
+
+        if (!defined('STACKSIGHT_TOKEN')) {
+            $list[] = __("Token is not defined<br>", 'stacksight');
+        } elseif(STACKSIGHT_TOKEN != $app['token']) {
+            $list[] = __("Tokens do not match<br>", 'stacksight'); 
+        }
+
+        if (!defined('STACKSIGHT_BOOTSTRAPED')) {
+            $list[] = __("bootstrap-wp.php is not included in wp-config.php<br>", 'stacksight');
+        }
+
+        return $list;
     }
 
 }
