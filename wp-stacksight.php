@@ -29,6 +29,7 @@ class WPStackSightPlugin {
             add_action('admin_menu', array($this, 'add_plugin_page'));
             add_action('admin_init', array($this, 'page_init'));
             add_action('admin_notices', array($this, 'show_errors'));
+            wp_enqueue_style('ss-admin', plugins_url('assets/css/ss-admin.css', __FILE__ ));
         }
 
         if (defined('STACKSIGHT_APP_ID') && defined('STACKSIGHT_TOKEN') && defined('STACKSIGHT_BOOTSTRAPED')) {
@@ -143,16 +144,6 @@ class WPStackSightPlugin {
                 // trigger_error('test', E_USER_ERROR);
             ?>
 <?php if ($ss_app): ?>
-    <style type="text/css">
-        .code-red {color: #cc3366;}
-        .code-yellow {color: #999966;}
-        .code-blue {color: #6600cc;}
-        .code-comments {color: #777;}
-        .code-ss-inlcude {font-weight: bold; }
-        .ss-diagnostic-block ul {color: red;list-style-type: disc; margin-left: 25px;}
-        .ss-diagnostic-block .ss-ok {color: green;}
-    </style>
-
     <div class="ss-config-block">
     <p><?php echo __("Copy a configuration code (start-end block) and modify your wp-config.php file like shown below") ?>:</p>
 <pre class="code-ss-inlcude">
