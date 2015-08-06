@@ -3,7 +3,7 @@
  * Plugin Name: Wordpress integration for stacksight
  * Plugin URI: http://mean.io
  * Description: Wordpress integration for stacksight
- * Version: 1.0
+ * Version: 1.1
  * Author: Linnovate Technologies LTD
  * Author URI: http://mean.io
  * License: GPL
