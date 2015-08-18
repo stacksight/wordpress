@@ -1,19 +1,22 @@
 === Stacksight ===
-Contributors: liorkesos, bora-89 
+Contributors: liorkesos, bora-89 , pojo.me, KingYes, ariel.k, maor
 Tags: administration, activity, event, monitor, multisite, multi-users, log, logger, audit log, stats, security, tracking, woocommerce, notifications, email notifications
 Requires at least: 3.5
 Tested up to: 4.2
 Stable tag: 2.2.1
 License: GPLv2 or later
-Credits: The awesome aryo-activity-log (by pojo.me) plugin which is used to collect some of the inisghts. Go pojo Go!
+Credits: 
 
-Get a realtime stream of events and logs from your wordpress applications (and other opensource applications as well!)
 
 == Description ==
 
-<h3>Like being in control? Check this out.</h3>
+<h3>Realtime inisights for you wordpress applications</h3>
+Get a realtime stream of events and logs from your wordpress applications (and other opensource applications as well!)
 
-<strong>Logs the next events to the stacksight.io dashboard</strong><br />
+<strong>Credits:</strong>
+Stacksight is a fork of the awesome (aryo-activity-log)[https://wordpress.org/plugins/aryo-activity-log/] plugin (by (pojo.me)[http://pojo.me]) which is used to collect some of the wordpress event stream. Go pojo Go!
+
+<strong>Stacksights logs the next events to the stacksight.io dashboard</strong><br />
 
 * <strong>WordPress</strong> - Core Updates
 * <strong>Posts</strong> - Created, Updated, Deleted
