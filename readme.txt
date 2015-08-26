@@ -2,8 +2,8 @@
 Contributors: liorkesos, bora-89 , pojo.me, KingYes, ariel.k, maor
 Tags: administration, activity, event, monitor, multisite, multi-users, log, logger, audit log, stats, security, tracking, woocommerce, notifications, email notifications
 Requires at least: 3.5
-Tested up to: 4.2
-Stable tag: 2.2.1
+Tested up to: 4.3
+Stable tag: 2.2.5
 License: GPLv2 or later
 Credits: 
 
@@ -53,6 +53,8 @@ Stacksight is a fork of the awesome (aryo-activity-log)[https://wordpress.org/pl
 * Persian (fa_IR) - [Promising](http://vwp.ir/)
 * Russian (ru_RU) - Oleg Reznikov
 * Polish (pl_PL) - Maciej Gryniuk
+* Czech (cs_CZ) - Martin Kokeš
+* Finnish (fi) - Nazq
 
 <strong>Contributions:</strong><br />
 ==== stacksight ====
@@ -87,6 +89,65 @@ Would you like to like to contribute to Activity Log? You are more than welcome 
 
 == Changelog ==
 
-= 0.1 =
-* Initial release to wordpress.org 
+= 2.2.6 =
+* Tweak! - Added more actions/types in notification
+
+= 2.2.5 =
+* New! - Added translate: Finnish (fi) - Thanks to Nazq ([topic](https://wordpress.org/support/topic/finnish-translation-1))
+* Tweak! - Better actions label in list table
+* Fixed! - Notice php warring in MU delete site
+* Tested up to WordPress v4.3
+
+= 2.2.4 =
+* New! - Added translate: Czech (cs_CZ) - Thanks to Martin Kokeš ([#76](https://github.com/KingYes/wordpress-aryo-activity-log/pull/76))
+
+= 2.2.3 =
+* Tweak! - Added more filters in table list columns
+
+= 2.2.2 =
+* Fixed! some PHP strict standards (PHP v5.4+)
+
+= 2.2.1 =
+* Fixes from prev release
+
+= 2.2.0 =
+* New! - Adds search box, to allow users to search the description field.
+* New! - Allows users to now filter by action
+* New! - Added translate: Polish (pl_PL) - Thanks to Maciej Gryniuk
+* Tweak! - SQL Optimizations for larger sites
+
+= 2.1.16 =
+* New! Added translate: Russian (ru_RU) - Thanks to Oleg Reznikov
+* Fixes Undefined property with some 3td party themes/plugins
+* Tested up to WordPress v4.2
+
+= 2.1.15 =
+* Tested up to WordPress v4.1
+* Change plugin name to "Activity Log"
+
+= 2.1.14 =
+* New! Added translate: Persian (fa_IR) - Thanks to [Promising](http://vwp.ir/)
+
+= 2.1.13 =
+* New! Added filter by User Roles ([#67](https://github.com/KingYes/wordpress-aryo-activity-log/issues/67))
+
+= 2.1.12 =
+* New! Added translate: Turkish (tr_TR) - Thanks to [Ahmet Kolcu](http://ahmetkolcu.org/)
+
+= 2.1.11 =
+* Fixed! Compatible for old WP version
+
+= 2.1.10 =
+* New! Now tracking when menus created and deleted
+* New! Added translate: Portuguese (pt_BR) - Thanks to [Criação de Sites](http://www.techload.com.br/criacao-de-sites-ribeirao-preto)
+
+= 2.1.9 =
+* New! Store all WooCommerce settings ([#62](https://github.com/KingYes/wordpress-aryo-activity-log/issues/62))
+* Tested up to WordPress v4.0
+
+= 2.1.8 =
+* New! Now tracking when plugins installed and updated ([#59](https://github.com/KingYes/wordpress-aryo-activity-log/pull/59) and [#43](https://github.com/KingYes/wordpress-aryo-activity-log/issues/43))
+
+= 2.1.7 =
+* New! Now tracking when user download export file from the site ([#58](https://github.com/KingYes/wordpress-aryo-activity-log/issues/58) and [#63](https://github.com/KingYes/wordpress-aryo-activity-log/pull/63))
 
