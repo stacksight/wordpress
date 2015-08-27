@@ -47,17 +47,15 @@ class WPStackSightPlugin {
                 'name' => $user->user_login
             );
         }
-        switch ($args['object_subtype']) {
-            case 'attachment':
-                $img_orig = wp_get_attachment_image_src($args['object_id'], 'full');
+        switch ($args['object_type']) {
+            case 'Attachment':
                 $mime = get_post_mime_type($args['object_id']);
-
                 $file_mime_ex = explode('/', $mime);
                 if (isset($file_mime_ex[0])) $event['subtype'] = $file_mime_ex[0];
-                if ($img_orig) $event['url'] = $img_orig[0];
+                if ($args['action'] != 'deleted') $event['url'] = wp_get_attachment_url($args['object_id']);
 
-                $res = $this->ss_client->publishEvent(array(
-                    'action' => 'uploaded',
+                $event = array(
+                    'action' => $args['action'],
                     'type' => 'file',
                     'name' => $args['object_name'],
                     'id' => $args['object_id'],
@@ -65,16 +63,47 @@ class WPStackSightPlugin {
                         'file_name' => $args['object_name'],
                         'type' => $mime,
                         'size' => filesize(get_attached_file($args['object_id'])),
-                        'url' => $event['url'],
+                        'url' => isset($event['url']) ? $event['url'] : '',
                     )
-                ) + $event);
-                // SSUtilities::error_log($res, 'debug');
+                ) + $event;
+
+                break;
+
+            case 'Post':
+                if ($args['action'] != 'deleted') $event['url'] = get_permalink($args['object_id']);
+
+                $event = array(
+                    'action' => $args['action'],
+                    'type' => 'content',
+                    'subtype' => $args['object_subtype'],
+                    'name' => $args['object_name'],
+                    'id' => $args['object_id']
+                ) + $event;
+
+                break;
+
+            case 'User':
+                $event = array(
+                    'action' => $args['action'],
+                    'type' => 'user',
+                    'name' => $args['object_name'],
+                    'id' => $args['object_id']
+                ) + $event;
+
+                break;
+
+            case 'Comments':
                 
+
                 break;
 
             default:
                 break;
         }
+
+        $res = $this->ss_client->publishEvent($event);
+        if (!$res['success']) SSUtilities::error_log($res['message'], 'error');
+        SSUtilities::error_log($args, 'aryo_hook');
 
         /*
         switch ($args['object_type']) {
@@ -113,7 +142,7 @@ class WPStackSightPlugin {
         }
 
         $res = $this->ss_client->publishEvent($data);
-        if (!$res['success']) SSUtilities::error_log($res['message'], 'error');*/
+        */
     }
 
     /**
@@ -146,7 +175,8 @@ class WPStackSightPlugin {
                 // show code instructions block
                 $app_settings = get_option('stacksight_opt');
                 $this->showInstructions($app_settings);
-                // echo '<pre>'.print_r($att_meta, true).'</pre>';
+                // $link = get_permalink(1078);
+                // echo '<pre>'.print_r($link, true).'</pre>';
                 // trigger_error('test', E_USER_ERROR);
             ?>
             <?php submit_button(); ?>
