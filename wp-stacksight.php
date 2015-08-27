@@ -18,7 +18,7 @@ require_once('stacksight-php-sdk/platforms/SSWordpressClient.php');
 
 class WPStackSightPlugin {
 
-    public $stacksight_client;
+    public $ss_client;
     private $options;
 
     public function __construct() {
@@ -33,46 +33,50 @@ class WPStackSightPlugin {
         }
 
         if (defined('STACKSIGHT_APP_ID') && defined('STACKSIGHT_TOKEN') && defined('STACKSIGHT_BOOTSTRAPED')) {
-            $this->stacksight_client = new SSWordpressClient(STACKSIGHT_TOKEN, 'wordpress');
-            $this->stacksight_client->initApp(STACKSIGHT_APP_ID);
+            $this->ss_client = new SSWordpressClient(STACKSIGHT_TOKEN, 'wordpress');
+            $this->ss_client->initApp(STACKSIGHT_APP_ID);
             add_action('aal_insert_log', array(&$this, 'insert_log_mean'), 30);
         }
     }
 
     public function insert_log_mean($args) {
-        $data = array();
-        $data['key'] = $args['object_type'];
-        $data['name'] = $args['action'];
-        $data['token'] = $this->options['token'];
-        if (!$args['object_subtype']) {
-            $data['data']['description'] = $args['object_type'] .' (' . $args['object_subtype'] .' has been '. $args['action'];
-        } else {
+        $event = array();
+        if (is_user_logged_in()) {
+            $user = wp_get_current_user();
+            $event['user'] = array(
+                'name' => $user->user_login
+            );
+        }
+        switch ($args['object_subtype']) {
+            case 'attachment':
+                $img_orig = wp_get_attachment_image_src($args['object_id'], 'full');
+                $mime = get_post_mime_type($args['object_id']);
 
-            switch ($args['object_subtype']) {
-                case 'attachment':
-                    $img_orig = wp_get_attachment_image_src($args['object_id'], 'full');
-                    if ($img_orig) {
-                        $img_orig_ex = pathinfo($img_orig[0]);
-                        $file = get_attached_file($args['object_id']);
-                        $file_ex = pathinfo($file);
-                        $image = wp_get_image_editor($file);
-                        if ( ! is_wp_error( $image ) ) {
-                            $image->resize(100, 100, true);
-                            $image->save($file_ex['dirname'].'/ss-thumb-'.$file_ex['basename']);
-                            $ss_thumb_url = $img_orig_ex['dirname'].'/ss-thumb-'.$img_orig_ex['basename'];
-                            $img = '<img src="'.$ss_thumb_url.'"/>';
-                        }
-                    }
-                    
-                    if (!$img) $data['data']['description'] = $args['object_type'] .' (' . $args['object_subtype'] . ') - '. $args['object_name'] .' has been '. $args['action'];
-                    else $data['data']['description'] = $args['object_type'] .' (image) '. $img .' has been '. $args['action'];
-                    break;
-                default:
-                    $data['data']['description'] = $args['object_type'] .' (' . $args['object_subtype'] . ') - '. $args['object_name'] .' has been '. $args['action'];
-                    break;
-            }
+                $file_mime_ex = explode('/', $mime);
+                if (isset($file_mime_ex[0])) $event['subtype'] = $file_mime_ex[0];
+                if ($img_orig) $event['url'] = $img_orig[0];
+
+                $res = $this->ss_client->publishEvent(array(
+                    'action' => 'uploaded',
+                    'type' => 'file',
+                    'name' => $args['object_name'],
+                    'id' => $args['object_id'],
+                    'data' => array(
+                        'file_name' => $args['object_name'],
+                        'type' => $mime,
+                        'size' => filesize(get_attached_file($args['object_id'])),
+                        'url' => $event['url'],
+                    )
+                ) + $event);
+                // SSUtilities::error_log($res, 'debug');
+                
+                break;
+
+            default:
+                break;
         }
 
+        /*
         switch ($args['object_type']) {
             case 'Post':
                 $data['design']['icon'] = 'fa-file-text';
@@ -108,8 +112,8 @@ class WPStackSightPlugin {
                 break;
         }
 
-        $res = $this->stacksight_client->publishEvent($data);
-        if (!$res['success']) SSUtilities::error_log($res['message'], 'error');
+        $res = $this->ss_client->publishEvent($data);
+        if (!$res['success']) SSUtilities::error_log($res['message'], 'error');*/
     }
 
     /**
@@ -139,41 +143,12 @@ class WPStackSightPlugin {
                 // This prints out all hidden setting fields
                 settings_fields( 'stacksight_option_group' );   
                 do_settings_sections( 'stacksight-set-admin' );
-                $ss_app = get_option('stacksight');
-                // echo '<pre>'.print_r(, true).'</pre>';
+                // show code instructions block
+                $app_settings = get_option('stacksight_opt');
+                $this->showInstructions($app_settings);
+                // echo '<pre>'.print_r($att_meta, true).'</pre>';
                 // trigger_error('test', E_USER_ERROR);
             ?>
-<?php if ($ss_app): ?>
-    <div class="ss-config-block">
-    <p><?php echo __("Copy a configuration code (start-end block) and modify your wp-config.php file like shown below") ?>:</p>
-<pre class="code-ss-inlcude">
-<span class="code-comments">// StackSight start config</span>
-<span class="code-red">define</span>(<span class="code-yellow">'STACKSIGHT_APP_ID'</span>, <span class="code-yellow">'<?php echo $ss_app['_id'] ?>'</span>);
-<span class="code-red">define</span>(<span class="code-yellow">'STACKSIGHT_TOKEN'</span>, <span class="code-yellow">'<?php echo $ss_app['token'] ?>'</span>);
-<span class="code-red">require_once</span>(<span class="code-blue">ABSPATH</span> . <span class="code-yellow">'/<?php echo $this->getRelativeRootPath(); ?>'</span> . <span class="code-yellow">'stacksight-php-sdk/bootstrap-wp.php'</span>);
-<span class="code-comments">// StackSight end config</span>
-
-<span class="code-comments">// insert previous code block before this line (do not copy the following lines)</span>
-<span class="code-comments">/** Sets up WordPress vars and included files. */</span>
-<span class="code-red">require_once</span>(<span class="code-blue">ABSPATH</span> . <span class="code-yellow">'wp-settings.php'</span>);
-</pre>
-    </div>
-        
-    <div class="ss-diagnostic-block">
-        <h3><?php echo __('wp-config.php status', 'stacksight') ?></h3>
-        <ul class="ss-config-diagnostic">
-            <?php if ($diagnostic = $this->getDiagnostic($ss_app)): ?>
-                <?php foreach ($diagnostic as $d_item): ?>
-                    <li><?php echo $d_item ?></li>
-                <?php endforeach ?>
-            <?php else: ?>
-                <h4 class="ss-ok">OK</h4>
-            <?php endif ?>
-        </ul>
-    </div>
-
-<?php endif ?>
-
             <?php submit_button(); ?>
             </form>
         </div>
@@ -196,15 +171,15 @@ class WPStackSightPlugin {
             'stacksight-set-admin' // Page
         );  
         add_settings_field(
-            'app_name', 
-            'App Name', 
-            array( $this, 'app_name_callback' ), 
+            '_id', 
+            'App ID', 
+            array( $this, 'app_id_callback' ), 
             'stacksight-set-admin', 
             'setting_section_stacksight'
         );    
         add_settings_field(
             'token', 
-            'App Access Token', 
+            'Access Token', 
             array( $this, 'token_callback' ), 
             'stacksight-set-admin', 
             'setting_section_stacksight'
@@ -221,24 +196,12 @@ class WPStackSightPlugin {
     public function sanitize($input) {
         $new_input = array();
 
-        if(!$input['app_name']) add_settings_error('app_name', 'app_name', '"App Name" can not be empty');
+        if(!$input['_id']) add_settings_error('_id', '_id', '"App ID" can not be empty');
         if(!$input['token']) add_settings_error('token', 'token', '"App Acces Token" can not be empty');
 
-
         $any_errors = $this->any_form_errors();
-        // if there are errors or name or token changed - reinit app
-        if (!$any_errors) {
-            if (!$this->stacksight_client) $this->stacksight_client = new SSWordpressClient($input['token'], 'wordpress');
-            $res = $this->stacksight_client->createApp($input['app_name']);
-            
-            if ($res['success']) {
-                if ($res['new']) add_settings_error('app_name', 'app_name', 'The app "'.$res['data']['name'].'" created successfully', 'updated');
-            } else {
-                add_settings_error('', '', $res['message']);
-            }
-        }
 
-        $new_input['app_name'] = $input['app_name'];
+        $new_input['_id'] = $input['_id'];
         $new_input['token'] = $input['token'];
         return $new_input;
     }
@@ -246,10 +209,10 @@ class WPStackSightPlugin {
     /** 
      * Get the settings option array and print one of its values
      */
-    public function app_name_callback() {
+    public function app_id_callback() {
         printf(
-            '<input type="text" id="app_name" name="stacksight_opt[app_name]" value="%s" size="50" />',
-            isset( $this->options['app_name'] ) ? esc_attr( $this->options['app_name']) : ''
+            '<input type="text" id="_id" name="stacksight_opt[_id]" value="%s" size="50" />',
+            isset( $this->options['_id'] ) ? esc_attr( $this->options['_id']) : ''
         );
     }
 
@@ -281,11 +244,9 @@ class WPStackSightPlugin {
     }
 
     public static function install() {
-        update_option('stacksight', '');
     }
 
     public static function uninstall() {
-        delete_option('stacksight');
         delete_option('stacksight_opt');
     }
 
@@ -318,6 +279,42 @@ class WPStackSightPlugin {
         return $list;
     }
 
+    public function showInstructions($app) {
+        $diagnostic = $this->getDiagnostic($app);
+        ?>
+<?php if ($app && $diagnostic): ?>
+    <div class="ss-config-block">
+    <p><?php echo __("Copy a configuration code (start-end block) and modify your wp-config.php file like shown below") ?>:</p>
+<pre class="code-ss-inlcude">
+<span class="code-comments">// StackSight start config</span>
+<span class="code-red">define</span>(<span class="code-yellow">'STACKSIGHT_APP_ID'</span>, <span class="code-yellow">'<?php echo $app['_id'] ?>'</span>);
+<span class="code-red">define</span>(<span class="code-yellow">'STACKSIGHT_TOKEN'</span>, <span class="code-yellow">'<?php echo $app['token'] ?>'</span>);
+<span class="code-red">require_once</span>(<span class="code-blue">ABSPATH</span> . <span class="code-yellow">'/<?php echo $this->getRelativeRootPath(); ?>'</span> . <span class="code-yellow">'stacksight-php-sdk/bootstrap-wp.php'</span>);
+<span class="code-comments">// StackSight end config</span>
+
+<span class="code-comments">// insert previous code block before this line (do not copy the following lines)</span>
+<span class="code-comments">/** Sets up WordPress vars and included files. */</span>
+<span class="code-red">require_once</span>(<span class="code-blue">ABSPATH</span> . <span class="code-yellow">'wp-settings.php'</span>);
+</pre>
+    </div>
+<?php endif ?>
+
+<div class="ss-diagnostic-block">
+    <h3><?php echo __('wp-config.php status', 'stacksight') ?></h3>
+    <ul class="ss-config-diagnostic">
+        <?php if ($diagnostic): ?>
+            <?php foreach ($diagnostic as $d_item): ?>
+                <li><?php echo $d_item ?></li>
+            <?php endforeach ?>
+        <?php else: ?>
+            <h4 class="ss-ok">OK</h4>
+        <?php endif ?>
+    </ul>
+</div>
+
+        <?php
+    }
+
 }
 
-$stacksight_client_plugin = new WPStackSightPlugin();
+$ss_client_plugin = new WPStackSightPlugin();
