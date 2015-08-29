@@ -93,7 +93,23 @@ class WPStackSightPlugin {
                 break;
 
             case 'Comments':
-                
+                if (in_array($args['action'], array('spam', 'trash', 'delete'))) return;
+
+                $comment = get_comment($args['object_id']);
+
+                if ($args['action'] == 'pending') {
+                    $action = 'added';
+                    if (!isset($event['user'])) $event['user'] = array(
+                        'name' => isset($comment->comment_author) ? $comment->comment_author : 'guest'
+                    );
+                } else $action = $args['action'];
+
+                $event = array(
+                    'action' => $action,
+                    'type' => 'comment',
+                    'name' => $comment->comment_content,
+                    'id' => $args['object_id']
+                ) + $event;
 
                 break;
 
@@ -175,8 +191,9 @@ class WPStackSightPlugin {
                 // show code instructions block
                 $app_settings = get_option('stacksight_opt');
                 $this->showInstructions($app_settings);
-                // $link = get_permalink(1078);
-                // echo '<pre>'.print_r($link, true).'</pre>';
+                $cid = 2;
+                $comment = get_comment($cid);
+                echo '<pre>'.print_r($comment, true).'</pre>';
                 // trigger_error('test', E_USER_ERROR);
             ?>
             <?php submit_button(); ?>
