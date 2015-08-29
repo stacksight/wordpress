@@ -290,29 +290,23 @@ class WPStackSightPlugin {
     public function getDiagnostic($app) {
         $list = array();
 
-        if (!defined('STACKSIGHT_APP_ID')) {
-            $list[] = __("App Id is not defined", 'stacksight');
-        } elseif (STACKSIGHT_APP_ID != $app['_id']) {
-            $list[] = __("App Ids do not match", 'stacksight');
+        if (defined('STACKSIGHT_TOKEN') && STACKSIGHT_TOKEN != $app['token']) {
+            $list[] = __('-- Tokens do not match', 'stacksight').'<br>';
+        }
+        if (defined('STACKSIGHT_APP_ID') && STACKSIGHT_APP_ID != $app['_id']) {
+            $list[] = __('-- App Ids do not match', 'stacksight');
+        }
+        if (!defined('STACKSIGHT_BOOTSTRAPED') || $list) {
+            $list[] = __('wp-config.php is not configured as specified above', 'stacksight').'<br>';
         }
 
-        if (!defined('STACKSIGHT_TOKEN')) {
-            $list[] = __("Token is not defined<br>", 'stacksight');
-        } elseif(STACKSIGHT_TOKEN != $app['token']) {
-            $list[] = __("Tokens do not match<br>", 'stacksight'); 
-        }
-
-        if (!defined('STACKSIGHT_BOOTSTRAPED')) {
-            $list[] = __("bootstrap-wp.php is not included in wp-config.php<br>", 'stacksight');
-        }
-
-        return $list;
+        return array_reverse($list);
     }
 
     public function showInstructions($app) {
         $diagnostic = $this->getDiagnostic($app);
         ?>
-<?php if ($app && $diagnostic): ?>
+<?php if ($app && $app['_id'] && $app['token'] && $diagnostic): ?>
     <div class="ss-config-block">
     <p><?php echo __("Copy a configuration code (start-end block) and modify your wp-config.php file like shown below") ?>:</p>
 <pre class="code-ss-inlcude">
