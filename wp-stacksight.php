@@ -119,7 +119,7 @@ class WPStackSightPlugin {
 
         $res = $this->ss_client->publishEvent($event);
         if (!$res['success']) SSUtilities::error_log($res['message'], 'error');
-        SSUtilities::error_log($args, 'aryo_hook');
+        // SSUtilities::error_log($args, 'aryo_hook');
 
         /*
         switch ($args['object_type']) {
@@ -191,9 +191,9 @@ class WPStackSightPlugin {
                 // show code instructions block
                 $app_settings = get_option('stacksight_opt');
                 $this->showInstructions($app_settings);
-                $cid = 2;
-                $comment = get_comment($cid);
-                echo '<pre>'.print_r($comment, true).'</pre>';
+                // $cid = 2;
+                // $comment = get_comment($cid);
+                // echo '<pre>'.print_r($comment, true).'</pre>';
                 // trigger_error('test', E_USER_ERROR);
             ?>
             <?php submit_button(); ?>
