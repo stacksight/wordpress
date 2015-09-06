@@ -20,6 +20,12 @@ class WPStackSightPlugin {
 
     public $ss_client;
     private $options;
+    private $dep_plugins = array(
+        'aryo-activity-log/aryo-activity-log.php' => array(
+            'name' => 'Activity Log',
+            'link' => 'https://wordpress.org/plugins/aryo-activity-log'
+        )
+    );
 
     public function __construct() {
         register_activation_hook( __FILE__, array(__CLASS__, 'install'));
@@ -306,24 +312,37 @@ class WPStackSightPlugin {
 
     public function getDiagnostic($app) {
         $list = array();
+        $show_code = false;
 
         if (defined('STACKSIGHT_TOKEN') && STACKSIGHT_TOKEN != $app['token']) {
             $list[] = __('-- Tokens do not match', 'stacksight').'<br>';
+            $show_code = true;
         }
         if (defined('STACKSIGHT_APP_ID') && STACKSIGHT_APP_ID != $app['_id']) {
             $list[] = __('-- App Ids do not match', 'stacksight');
+            $show_code = true;
         }
         if (!defined('STACKSIGHT_BOOTSTRAPED') || $list) {
             $list[] = __('wp-config.php is not configured as specified above', 'stacksight').'<br>';
+            $show_code = true;
         }
 
-        return array_reverse($list);
+        foreach ($this->dep_plugins as $plugin => $d_plg) {
+            if (!is_plugin_active($plugin)) {
+                $list[] = SSUtilities::t('Plugin <a target="_blank" href="{link}">{plugin}</a> is required, please install and activate', array(
+                    '{link}' => $d_plg['link'], 
+                    '{plugin}' => $d_plg['name']
+                )).'<br>';
+            }
+        }
+
+        return array('list' => array_reverse($list), 'show_code' => $show_code);
     }
 
     public function showInstructions($app) {
         $diagnostic = $this->getDiagnostic($app);
         ?>
-<?php if ($app && $app['_id'] && $app['token'] && $diagnostic): ?>
+<?php if ($app && $app['_id'] && $app['token'] && $diagnostic['show_code']): ?>
     <div class="ss-config-block">
     <p><?php echo __("Copy a configuration code (start-end block) and modify your wp-config.php file like shown below") ?>:</p>
 <pre class="code-ss-inlcude">
@@ -341,10 +360,10 @@ class WPStackSightPlugin {
 <?php endif ?>
 
 <div class="ss-diagnostic-block">
-    <h3><?php echo __('wp-config.php status', 'stacksight') ?></h3>
+    <h3><?php echo __('Configuration status', 'stacksight') ?></h3>
     <ul class="ss-config-diagnostic">
-        <?php if ($diagnostic): ?>
-            <?php foreach ($diagnostic as $d_item): ?>
+        <?php if ($diagnostic['list']): ?>
+            <?php foreach ($diagnostic['list'] as $d_item): ?>
                 <li><?php echo $d_item ?></li>
             <?php endforeach ?>
         <?php else: ?>
