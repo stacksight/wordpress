@@ -42,7 +42,13 @@ class WPStackSightPlugin {
             $this->ss_client = new SSWordpressClient(STACKSIGHT_TOKEN, 'wordpress');
             $this->ss_client->initApp(STACKSIGHT_APP_ID);
             add_action('aal_insert_log', array(&$this, 'insert_log_mean'), 30);
+            add_action('stacksight_check_updates_action', array($this, 'cron_check_updates'));
         }
+    }
+
+    public function cron_check_updates() {
+        SSUtilities::error_log('cron_check_updates just run!', 'cron_daily');
+        $this->ss_client->sendUpdates(array('data' => $this->get_update_info() ));
     }
 
     public function insert_log_mean($args) {
@@ -197,15 +203,72 @@ class WPStackSightPlugin {
                 // show code instructions block
                 $app_settings = get_option('stacksight_opt');
                 $this->showInstructions($app_settings);
-                // $cid = 2;
-                // $comment = get_comment($cid);
-                // echo '<pre>'.print_r($comment, true).'</pre>';
                 // trigger_error('test', E_USER_ERROR);
+                // echo '<pre>'.print_r($upd, true).'</pre>';
             ?>
             <?php submit_button(); ?>
             </form>
         </div>
         <?php
+    }
+
+    public function get_update_info() {
+        $upd = array();
+        $plg_upd = get_plugin_updates();
+        $thm_upd = get_theme_updates();
+        $core_upd = get_core_updates();
+
+        foreach ($plg_upd as $key => $uitem) {
+            $upd[] = array(
+                'title' => $uitem->Name,
+                // 'release_ts' => $uitem['datestamp'],
+                'current_version' => $uitem->Version,
+                'latest_version' => $uitem->update->new_version,
+                'type' => 'plugin',
+                'status' => 5, // 5 means new update is available
+                'description' => isset($uitem->update->upgrade_notice) ? $uitem->update->upgrade_notice : '',
+                'link' => $uitem->PluginURI,
+                'release_link' => $uitem->update->url . 'changelog',
+                'download_link' => $uitem->update->package,
+                'update_link' => site_url('wp-admin/update-core.php'),
+            );
+        }
+
+        foreach ($thm_upd as $theme => $uitem) {
+            $upd[] = array(
+                'title' => $uitem->display('Name'),
+                // 'release_ts' => $uitem['datestamp'],
+                'current_version' => $uitem->display('Version'),
+                'latest_version' => $uitem->update['new_version'],
+                'type' => 'theme',
+                'status' => 5, // 5 means new update is available
+                'description' => isset($uitem->update['upgrade_notice']) ? $uitem->update['upgrade_notice'] : '',
+                'link' => $uitem->update->url,
+                'release_link' => 'https://themes.trac.wordpress.org/log/'.$theme,
+                'download_link' => $uitem->update->package,
+                'update_link' => site_url('wp-admin/update-core.php'),
+            );
+        }
+
+        if ( isset($core_upd[0]->response) || 'upgrade' == $core_upd[0]->response ) {
+            $cur_version = get_bloginfo('version');
+            foreach ($core_upd as $uitem) {
+                $upd[] = array(
+                    'title' => 'WordPress Core',
+                    'current_version' => $cur_version,
+                    'latest_version' => $uitem->version,
+                    'type' => 'core',
+                    'status' => 1, // 1 means security update (recommended)
+                    'link' => 'https://wordpress.org',
+                    'release_link' => 'https://codex.wordpress.org/Changelog/'.$uitem->version,
+                    'download_link' => $uitem->download,
+                    'update_link' => site_url('wp-admin/update-core.php'),
+                );
+            }
+            
+        }
+
+        return $upd;
     }
 
     /**
@@ -297,10 +360,12 @@ class WPStackSightPlugin {
     }
 
     public static function install() {
+        wp_schedule_event(time(), 'daily', 'stacksight_check_updates_action');
     }
 
     public static function uninstall() {
         delete_option('stacksight_opt');
+        wp_clear_scheduled_hook('stacksight_check_updates_action');
     }
 
     public function getRelativeRootPath() {
