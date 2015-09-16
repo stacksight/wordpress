@@ -3,7 +3,7 @@
  * Plugin Name: Stacksight
  * Plugin URI: http://mean.io
  * Description: Stacksight wordpress support (featuring events, error logs and updates)
- * Version: 1.11
+ * Version: 1.12
  * Author: Stacksight LTD
  * Author URI: http://stacksight.io
  * License: GPL
@@ -41,13 +41,26 @@ class WPStackSightPlugin {
         if (defined('STACKSIGHT_APP_ID') && defined('STACKSIGHT_TOKEN') && defined('STACKSIGHT_BOOTSTRAPED')) {
             $this->ss_client = new SSWordpressClient(STACKSIGHT_TOKEN, 'wordpress');
             $this->ss_client->initApp(STACKSIGHT_APP_ID);
+            add_filter('cron_schedules', array($this, 'cron_custom_interval'));
             add_action('aal_insert_log', array(&$this, 'insert_log_mean'), 30);
             add_action('stacksight_check_updates_action', array($this, 'cron_check_updates'));
         }
     }
 
+    public function cron_custom_interval($schedules) {
+        $this->options = get_option('stacksight_opt');
+        $interval = isset($this->options['cron_updates_interval']) ? (int)$this->options['cron_updates_interval'] : 86400; // default dayli
+
+        $schedules['updates_interval'] = array(
+            'interval' => $interval,
+            'display' => __('Once a specified period')
+        );
+
+        return $schedules;
+    }
+
     public function cron_check_updates() {
-        SSUtilities::error_log('cron_check_updates just run!', 'cron_daily');
+        SSUtilities::error_log('cron_check_updates has been run', 'cron_log');
         $this->ss_client->sendUpdates(array('data' => $this->get_update_info() ));
     }
 
@@ -203,8 +216,9 @@ class WPStackSightPlugin {
                 // show code instructions block
                 $app_settings = get_option('stacksight_opt');
                 $this->showInstructions($app_settings);
+
                 // trigger_error('test', E_USER_ERROR);
-                // echo '<pre>'.print_r($upd, true).'</pre>';
+                // echo '<pre>'.print_r($this->options['cron_updates_interval'], true).'</pre>';
             ?>
             <?php submit_button(); ?>
             </form>
@@ -213,6 +227,8 @@ class WPStackSightPlugin {
     }
 
     public function get_update_info() {
+        require_once(ABSPATH.'wp-admin/includes/update.php');
+
         $upd = array();
         $plg_upd = get_plugin_updates();
         $thm_upd = get_theme_updates();
@@ -299,6 +315,13 @@ class WPStackSightPlugin {
             array( $this, 'token_callback' ), 
             'stacksight-set-admin', 
             'setting_section_stacksight'
+        );   
+        add_settings_field(
+            'cron_updates_interval', 
+            'Cron updates interval', 
+            array( $this, 'cron_updates_interval_callback' ), 
+            'stacksight-set-admin', 
+            'setting_section_stacksight'
         );
 
         $this->options = get_option('stacksight_opt');
@@ -319,6 +342,11 @@ class WPStackSightPlugin {
 
         $new_input['_id'] = $input['_id'];
         $new_input['token'] = $input['token'];
+        $new_input['cron_updates_interval'] = $input['cron_updates_interval'];
+        // schedule the updates action
+        wp_clear_scheduled_hook('stacksight_check_updates_action');
+        wp_schedule_event(time(), 'updates_interval', 'stacksight_check_updates_action');
+
         return $new_input;
     }
 
@@ -337,6 +365,34 @@ class WPStackSightPlugin {
             '<input type="text" id="token" name="stacksight_opt[token]" value="%s" size="50" />',
             isset( $this->options['token'] ) ? esc_attr( $this->options['token']) : ''
         );
+    }
+
+    public function cron_updates_interval_callback() {
+        $arr_opt = array(
+            60 => 'Every minute',
+            3600 => 'Every hour',
+            7200 => 'Every two hours',
+            21600 => 'Every 6 hours',
+            43200 => 'Every 12 hours',
+            86400 => 'Every day',
+            172800 => 'Every 2 days',
+            259200 => 'Every 3 days',
+            604800 => 'Every week',
+            2635200 => 'Every month',
+        );
+
+        $opt_str = '';
+        $interval = isset($this->options['cron_updates_interval']) ? (int)$this->options['cron_updates_interval'] : 86400;
+
+        foreach ($arr_opt as $seconds => $caption) {
+            $opt_str .= SSUtilities::t('<option {selected} value="{seconds}">{caption}</option>', array(
+                '{selected}' => $seconds === $interval ? 'selected' : '',
+                '{seconds}' => $seconds,
+                '{caption}' => $caption,
+            ));
+        }
+
+        printf('<select id="cron_updates_interval" name="stacksight_opt[cron_updates_interval]">%s</select>', $opt_str);
     }
 
     /**
@@ -360,7 +416,7 @@ class WPStackSightPlugin {
     }
 
     public static function install() {
-        wp_schedule_event(time(), 'daily', 'stacksight_check_updates_action');
+        
     }
 
     public static function uninstall() {
