@@ -3,7 +3,7 @@
  * Plugin Name: Stacksight
  * Plugin URI: http://mean.io
  * Description: Stacksight wordpress support (featuring events, error logs and updates)
- * Version: 1.12
+ * Version: 1.32
  * Author: Stacksight LTD
  * Author URI: http://stacksight.io
  * License: GPL
@@ -36,6 +36,7 @@ class WPStackSightPlugin {
             add_action('admin_init', array($this, 'page_init'));
             add_action('admin_notices', array($this, 'show_errors'));
             wp_enqueue_style('ss-admin', plugins_url('assets/css/ss-admin.css', __FILE__ ));
+            add_filter( 'plugin_action_links_' . plugin_basename(__FILE__), array($this, 'stacksight_plugin_action_links'));
         }
 
         if (defined('STACKSIGHT_APP_ID') && defined('STACKSIGHT_TOKEN') && defined('STACKSIGHT_BOOTSTRAPED')) {
@@ -45,6 +46,12 @@ class WPStackSightPlugin {
             add_action('aal_insert_log', array(&$this, 'insert_log_mean'), 30);
             add_action('stacksight_check_updates_action', array($this, 'cron_check_updates'));
         }
+        
+    }
+
+    public function stacksight_plugin_action_links( $links ) {
+       $links[] = '<a href="'. esc_url( get_admin_url(null, 'options-general.php?page=stacksight') ) .'">'.__('Settings').'</a>';
+       return $links;
     }
 
     public function cron_custom_interval($schedules) {
@@ -465,17 +472,15 @@ class WPStackSightPlugin {
         ?>
 <?php if ($app && $app['_id'] && $app['token'] && $diagnostic['show_code']): ?>
     <div class="ss-config-block">
-    <p><?php echo __("Copy a configuration code (start-end block) and modify your wp-config.php file like shown below") ?>:</p>
+    <p><?php echo __("Insert that code (start - end) at the top of your wp-config.php after a line <strong>".htmlspecialchars('<?php')." </strong>") ?></p>
 <pre class="code-ss-inlcude">
 <span class="code-comments">// StackSight start config</span>
-<span class="code-red">define</span>(<span class="code-yellow">'STACKSIGHT_APP_ID'</span>, <span class="code-yellow">'<?php echo $app['_id'] ?>'</span>);
-<span class="code-red">define</span>(<span class="code-yellow">'STACKSIGHT_TOKEN'</span>, <span class="code-yellow">'<?php echo $app['token'] ?>'</span>);
-<span class="code-red">require_once</span>(<span class="code-blue">ABSPATH</span> . <span class="code-yellow">'/<?php echo $this->getRelativeRootPath(); ?>'</span> . <span class="code-yellow">'stacksight-php-sdk/bootstrap-wp.php'</span>);
-<span class="code-comments">// StackSight end config</span>
-
-<span class="code-comments">// insert previous code block before this line (do not copy the following lines)</span>
-<span class="code-comments">/** Sets up WordPress vars and included files. */</span>
-<span class="code-red">require_once</span>(<span class="code-blue">ABSPATH</span> . <span class="code-yellow">'wp-settings.php'</span>);
+$ss_inc<span class="code-red"> = </span><span class="code-blue">__DIR__</span><span class="code-red"> . </span><span class="code-yellow">'/<?php echo $this->getRelativeRootPath(); ?>stacksight-php-sdk/bootstrap-wp.php'</span>;
+<span class="code-red">if</span>(<span class="code-blue">is_file</span>($ss_inc)) {
+    <span class="code-red">define</span>(<span class="code-yellow">'STACKSIGHT_APP_ID'</span>, <span class="code-yellow">'<?php echo $app['_id'] ?>'</span>);
+    <span class="code-red">define</span>(<span class="code-yellow">'STACKSIGHT_TOKEN'</span>, <span class="code-yellow">'<?php echo $app['token'] ?>'</span>);
+    <span class="code-red">require_once</span>($ss_inc);
+} <span class="code-comments">// StackSight end config</span>
 </pre>
     </div>
 <?php endif ?>
