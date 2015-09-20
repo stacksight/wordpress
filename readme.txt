@@ -1,9 +1,9 @@
 === Stacksight ===
-Contributors: liorkesos, bora-89 , pojo.me, KingYes, ariel.k, maor
+Contributors: liorkesos, bora-89 
 Tags: administration, activity, event, monitor, multisite, multi-users, log, logger, audit log, stats, security, tracking, woocommerce, notifications, email notifications
 Requires at least: 3.5
 Tested up to: 4.3
-Stable tag: 1.12
+Stable tag: 1.31
 License: GPLv2 or later
 
 
