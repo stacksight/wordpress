@@ -224,6 +224,29 @@ class WPStackSightPlugin {
                 $app_settings = get_option('stacksight_opt');
                 $this->showInstructions($app_settings);
 
+                $meter = $this->getSecureStrengthMeterValues();
+                if ($meter !== null) {
+                    $health = array();
+                    $health['data'][] = array(
+                        'category' => 'security',
+                        'title' => 'All In One WP Security',
+                        'desc' => 'All round best WordPress security plugin!',
+                        'widgets' => array(
+                            'type' => 'meter',
+                            'title' => 'Security Strength Meter', 
+                            'desc' => 'Security strength meter shows the summary how your site is secure', // Optional
+                            'order' => 1,       // specifies the block sequence (the place in DOM). Optinal
+                            'group' => 1,       // specifies the group where the widget will be rendered.
+                                                // lets sey for meter widget where will be 2 checklists but they should be display in once parent DOM container. Optinal
+                            'point_max' => $meter['point_max'], // max available points to gain
+                            'point_cur' => $meter['point_cur'],  // current amount of the points
+                            // plugin secific settings url
+                            // 'plugin_url' => 'http://stacksight.io/wp-admin?plugin=stacksight&dir=meter'
+                        )
+                    );
+                    $res = $this->ss_client->sendHealth($health);
+                }
+
                 // trigger_error('test', E_USER_ERROR);
                 // echo '<pre>'.print_r($this->options['cron_updates_interval'], true).'</pre>';
             ?>
@@ -231,6 +254,23 @@ class WPStackSightPlugin {
             </form>
         </div>
         <?php
+    }
+
+    public function getSecureStrengthMeterValues() {
+        $all_in_one = WP_PLUGIN_DIR . '/all-in-one-wp-security-and-firewall';
+        if ( is_dir( $all_in_one ) ) {
+            include_once($all_in_one.'/wp-security-core.php');
+            global $aio_wp_security;
+            // echo '<pre>'.print_r($aio_wp_security, true).'</pre>';
+            $aio_wp_security->admin_init->initialize_feature_manager();
+            global $aiowps_feature_mgr;
+
+            return array(
+                'point_max' => $aiowps_feature_mgr->get_total_achievable_points(),
+                'point_cur' => $aiowps_feature_mgr->get_total_site_points()
+            );
+        }
+        
     }
 
     public function get_update_info() {
