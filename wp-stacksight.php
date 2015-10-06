@@ -20,6 +20,7 @@ class WPStackSightPlugin {
 
     public $ss_client;
     private $options;
+    private $health;
     private $dep_plugins = array(
         'aryo-activity-log/aryo-activity-log.php' => array(
             'name' => 'Activity Log',
@@ -44,7 +45,7 @@ class WPStackSightPlugin {
             $this->ss_client->initApp(STACKSIGHT_APP_ID);
             add_filter('cron_schedules', array($this, 'cron_custom_interval'));
             add_action('aal_insert_log', array(&$this, 'insert_log_mean'), 30);
-            add_action('stacksight_check_updates_action', array($this, 'cron_check_updates'));
+            add_action('stacksight_main_action', array($this, 'cron_do_main_job'));
         }
         
     }
@@ -66,9 +67,27 @@ class WPStackSightPlugin {
         return $schedules;
     }
 
-    public function cron_check_updates() {
-        SSUtilities::error_log('cron_check_updates has been run', 'cron_log');
-        $this->ss_client->sendUpdates(array('data' => $this->get_update_info() ));
+    public function cron_do_main_job() {
+        SSUtilities::error_log('cron_do_main_job has been run', 'cron_log');
+        // updates
+        $updates = array(
+            'data' => $this->get_update_info()
+        );
+        $this->ss_client->sendUpdates($updates);
+
+        // health, include health security class if All in One Security plugin exists
+        $all_in_one_dir = WP_PLUGIN_DIR.'/all-in-one-wp-security-and-firewall';
+        if (is_file($all_in_one_dir.'/wp-security-core.php')) {
+            require_once($all_in_one_dir.'/wp-security-core.php');
+            require_once($all_in_one_dir.'/admin/wp-security-admin-init.php');
+            require_once('inc/wp-health-security.php');
+            // echo '<pre>'.print_r($GLOBALS['aio_wp_security'], true).'</pre>';
+            $this->health = new stdClass;
+            $this->health->security = new WPHealthSecurity;
+            $health = array();
+            $health['data'][] = $this->getSecurityData();
+            $this->ss_client->sendHealth($health);
+        }
     }
 
     public function insert_log_mean($args) {
@@ -151,46 +170,6 @@ class WPStackSightPlugin {
 
         $res = $this->ss_client->publishEvent($event);
         if (!$res['success']) SSUtilities::error_log($res['message'], 'error');
-        // SSUtilities::error_log($args, 'aryo_hook');
-
-        /*
-        switch ($args['object_type']) {
-            case 'Post':
-                $data['design']['icon'] = 'fa-file-text';
-                $data['design']['color'] = '#8FD5FF';
-                break;
-            case 'User':
-               $data['design']['icon'] = 'fa-user';
-               $data['design']['color'] = '#8664aa';
-                break;
-            case 'Comments':
-               $data['design']['icon'] = 'fa-comment';
-               $data['design']['color'] = '#99b5bc';
-                break;
-            case 'Menu':
-               $data['design']['icon'] = 'fa-bars';
-               $data['design']['color'] = '#fd8e00';
-                break;
-            case 'Taxonomy':
-               $data['design']['icon'] = 'fa-pie-chart';
-               $data['design']['color'] = '#de1b16';
-                break;
-            case 'Attachment':
-               $data['design']['icon'] = 'fa-paperclip';
-               $data['design']['color'] = '#92c54c';
-                break;
-            case 'Options':
-               $data['design']['icon'] = 'fa-cog';
-               $data['design']['color'] = '#fbe939';
-                break;
-            default:
-                $data['design']['color'] = '#19617a';
-                $data['design']['icon'] = 'fa-bars';
-                break;
-        }
-
-        $res = $this->ss_client->publishEvent($data);
-        */
     }
 
     /**
@@ -224,31 +203,8 @@ class WPStackSightPlugin {
                 $app_settings = get_option('stacksight_opt');
                 $this->showInstructions($app_settings);
 
-                $meter = $this->getSecureStrengthMeterValues();
-                if ($meter !== null) {
-                    $health = array();
-                    $health['data'][] = array(
-                        'category' => 'security',
-                        'title' => 'All In One WP Security',
-                        'desc' => 'All round best WordPress security plugin!',
-                        'widgets' => array(
-                            'type' => 'meter',
-                            'title' => 'Security Strength Meter', 
-                            'desc' => 'Security strength meter shows the summary how your site is secure', // Optional
-                            'order' => 1,       // specifies the block sequence (the place in DOM). Optinal
-                            'group' => 1,       // specifies the group where the widget will be rendered.
-                                                // lets sey for meter widget where will be 2 checklists but they should be display in once parent DOM container. Optinal
-                            'point_max' => $meter['point_max'], // max available points to gain
-                            'point_cur' => $meter['point_cur'],  // current amount of the points
-                            // plugin secific settings url
-                            // 'plugin_url' => 'http://stacksight.io/wp-admin?plugin=stacksight&dir=meter'
-                        )
-                    );
-                    $res = $this->ss_client->sendHealth($health);
-                }
-
                 // trigger_error('test', E_USER_ERROR);
-                // echo '<pre>'.print_r($this->options['cron_updates_interval'], true).'</pre>';
+                // echo '<pre>'.print_r($GLOBALS['aio_wp_security'], true).'</pre>';
             ?>
             <?php submit_button(); ?>
             </form>
@@ -256,21 +212,44 @@ class WPStackSightPlugin {
         <?php
     }
 
-    public function getSecureStrengthMeterValues() {
-        $all_in_one = WP_PLUGIN_DIR . '/all-in-one-wp-security-and-firewall';
-        if ( is_dir( $all_in_one ) ) {
-            include_once($all_in_one.'/wp-security-core.php');
-            global $aio_wp_security;
-            // echo '<pre>'.print_r($aio_wp_security, true).'</pre>';
-            $aio_wp_security->admin_init->initialize_feature_manager();
-            global $aiowps_feature_mgr;
+    public function getSecurityData() {
+        if (empty($this->health)) return;
 
-            return array(
-                'point_max' => $aiowps_feature_mgr->get_total_achievable_points(),
-                'point_cur' => $aiowps_feature_mgr->get_total_site_points()
+        $data = array(
+            'category' => 'security',
+            'title' => __('Security summary'),
+            'desc' => __('This panel shows the summary how your site is secure (according to the All In One Security And Firewall plugin)'),
+            'plugin_url' => site_url('wp-admin/admin.php?page='.AIOWPSEC_MAIN_MENU_SLUG)
+        );
+
+        $meter = $this->health->security->getStrengthMeterValues();
+        if (!empty($meter)) {
+            $data['widgets'][] = array(
+                'type' => 'meter',
+                'title' => __('Security Strength Meter'), 
+                'desc' => __('This meter shows in points the security level of your site'), // Optional
+                'order' => 1,       // specifies the block sequence (the place in DOM). Optinal
+                'group' => 1,       // specifies the group where the widget will be rendered.
+                                    // lets sey for meter widget where will be 2 checklists but they should be display in once parent DOM container. Optinal
+                'point_max' => $meter['point_max'], // max available points to gain
+                'point_cur' => $meter['point_cur']  // current amount of the points
             );
         }
-        
+
+        $critical_features = $this->health->security->getCriticalFeaturesStatus();
+        if (!empty($critical_features)) {
+            $data['widgets'][] = array(
+                'type' => 'checklist',
+                'title' => __('Critical Features Status'), 
+                'desc' => __('Below is the current status of the critical features that you should activate on your site to achieve a minimum level of recommended security','all-in-one-wp-security-and-firewall'),
+                'order' => 2,       // specifies the block sequence (the place in DOM). Optinal
+                'group' => 1,       // specifies the group where the widget will be rendered.
+                                    // lets sey for meter widget where will be 2 checklists but they should be display in once parent DOM container. Optinal
+                'checklist' => $critical_features
+            );
+        }
+
+        return $data;
     }
 
     public function get_update_info() {
@@ -391,8 +370,8 @@ class WPStackSightPlugin {
         $new_input['token'] = $input['token'];
         $new_input['cron_updates_interval'] = $input['cron_updates_interval'];
         // schedule the updates action
-        wp_clear_scheduled_hook('stacksight_check_updates_action');
-        wp_schedule_event(time(), 'updates_interval', 'stacksight_check_updates_action');
+        wp_clear_scheduled_hook('stacksight_main_action');
+        wp_schedule_event(time(), 'updates_interval', 'stacksight_main_action');
 
         return $new_input;
     }
@@ -416,6 +395,7 @@ class WPStackSightPlugin {
 
     public function cron_updates_interval_callback() {
         $arr_opt = array(
+            1 => 'Every second',
             60 => 'Every minute',
             3600 => 'Every hour',
             7200 => 'Every two hours',
@@ -468,7 +448,7 @@ class WPStackSightPlugin {
 
     public static function uninstall() {
         delete_option('stacksight_opt');
-        wp_clear_scheduled_hook('stacksight_check_updates_action');
+        wp_clear_scheduled_hook('stacksight_main_action');
     }
 
     public function getRelativeRootPath() {
