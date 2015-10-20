@@ -47,7 +47,6 @@ class WPStackSightPlugin {
             add_action('aal_insert_log', array(&$this, 'insert_log_mean'), 30);
             add_action('stacksight_main_action', array($this, 'cron_do_main_job'));
         }
-        
     }
 
     public function stacksight_plugin_action_links( $links ) {
@@ -249,12 +248,27 @@ class WPStackSightPlugin {
             );
         }
 
+        $points_data = $this->health->security->getSecurityPointsInfo();
+
+        if(!empty($points_data)){
+            $data['widgets'][] = array(
+                'type' => 'pointslist',
+                'title' => __('Secure points tasks'),
+                'desc' => __('Secure points tasks desc','all-in-one-wp-security-and-firewall'),
+                'order' => 3,       // specifies the block sequence (the place in DOM). Optinal
+                'group' => 1,       // specifies the group where the widget will be rendered.
+                // lets sey for meter widget where will be 2 checklists but they should be display in once parent DOM container. Optinal
+                'pointslist' => $points_data
+            );
+        }
         return $data;
     }
 
     public function get_update_info() {
         require_once(ABSPATH.'wp-admin/includes/update.php');
-
+        if ( ! function_exists( 'get_plugins' ) ) {
+            require_once ABSPATH . 'wp-admin/includes/plugin.php';
+        }
         $upd = array();
         $plg_upd = get_plugin_updates();
         $thm_upd = get_theme_updates();
