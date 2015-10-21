@@ -3,7 +3,7 @@ Contributors: liorkesos, bora-89
 Tags: administration, activity, event, monitor, multisite, multi-users, log, logger, audit log, stats, security, tracking, woocommerce, notifications, email notifications
 Requires at least: 3.5
 Tested up to: 4.3
-Stable tag: 1.5
+Stable tag: 1.43
 License: GPLv2 or later
 
 
