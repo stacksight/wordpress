@@ -12,7 +12,7 @@ Get a realtime stream of events and logs from your wordpress applications (and o
 
 == Description ==
 
-Stacksight uses the awesome <a href="https://wordpress.org/plugins/aryo-activity-log/">aryo activity log</a> plugin (by <a href="http://pojo.me">pojo.me</a> to send a realtime event stream of your wordpress activity.
+Stacksight uses the awesome <a href="https://wordpress.org/plugins/aryo-activity-log/">activity log</a> plugin (by <a href="http://pojo.me">pojo.me</a> to send a realtime event stream of your wordpress activity.
 
 <strong>Stacksight logs the next events to the stacksight.io dashboard</strong><br />
 
