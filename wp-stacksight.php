@@ -82,30 +82,11 @@ class WPStackSightPlugin {
             require_once('inc/wp-health-security.php');
             // echo '<pre>'.print_r($GLOBALS['aio_wp_security'], true).'</pre>';
             $this->health = new stdClass;
-            $this->health->security = new WPHealthSecurity();
+            $this->health->security = new WPHealthSecurity;
             $health = array();
             $health['data'][] = $this->getSecurityData();
-        }
-
-        $seo_dir = WP_PLUGIN_DIR.'/wordpress-seo';
-        if (is_file($seo_dir.'/wp-seo-main.php')) {
-            require_once('inc/wp-health-seo.php');
-
-            if(!$this->health)
-                $this->health = new stdClass;
-
-            $this->health->seo = new WPHealthSeo();
-            if(!isset($health))
-                $health = array();
-
-            if($seo_data = $this->getSeoData())
-                $health['data'][] = $seo_data;
-        }
-
-        if(isset($health['data']) && !empty($health['data'])){
             $this->ss_client->sendHealth($health);
         }
-
     }
 
     public function insert_log_mean($args) {
@@ -228,60 +209,6 @@ class WPStackSightPlugin {
             </form>
         </div>
         <?php
-    }
-
-    public function getSeoData() {
-        if (empty($this->health)) return;
-
-        $returned = false;
-
-        $data = array(
-            'category' => 'seo',
-            'title' => __('SEO'),
-            'desc' => __('This panel shows your SEO (according to the Yoast SEO plugin)'),
-        );
-
-        $general_seo = $this->health->seo->getSeoValues();
-        if (!empty($general_seo)) {
-            if(!empty($general_seo['performance'])){
-                $data['widgets'][] = array(
-                    'type' => 'seo_meter',
-                    'title' => __('General SEO performance'),
-                    'desc' => __('This is general performance information'), // Optional
-                    'order' => 1,       // specifies the block sequence (the place in DOM). Optinal
-                    'group' => 1,       // specifies the group where the widget will be rendered.
-                    'seo_meter' => $general_seo['performance']
-                );
-                $returned = true;
-            }
-
-            if(!empty($general_seo['graphic'])){
-                $data['widgets'][] = array(
-                    'type' => 'seo_chart',
-                    'title' => __('SEO graphic data'),
-                    'desc' => __('This is general graphic information about posts'), // Optional
-                    'order' => 2,       // specifies the block sequence (the place in DOM). Optinal
-                    'group' => 1,       // specifies the group where the widget will be rendered.
-                    'seo_chart' => $general_seo['graphic']
-                );
-                $returned = true;
-            }
-
-            if(!empty($general_seo['detail'])){
-                $data['widgets'][] = array(
-                    'type' => 'seo_detail',
-                    'title' => __('SEO detail data'),
-                    'desc' => __('This is detail information about posts'), // Optional
-                    'order' => 3,       // specifies the block sequence (the place in DOM). Optinal
-                    'group' => 1,       // specifies the group where the widget will be rendered.
-                    'seo_detail' => $general_seo['detail']
-                );
-                $returned = true;
-            }
-        }
-        if ($returned === true){
-            return $data;
-        } else return false;
     }
 
     public function getSecurityData() {
