@@ -24,12 +24,12 @@ class WPHealthSeo
             return false;
 
         $results = array();
-        $results['good'] = [];
-        $results['ok'] = [];
-        $results['poor'] = [];
-        $results['bad'] = [];
-        $results['no_focus'] = [];
-        $results['no_index'] = [];
+        $results['good'] = array();
+        $results['ok'] = array();
+        $results['poor'] = array();
+        $results['bad'] = array();
+        $results['no_focus'] = array();
+        $results['no_index'] = array();
         foreach($posts as $post){
             if(isset($post->meta_key) && $post->meta_key){
 
