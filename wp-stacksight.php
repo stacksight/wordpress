@@ -102,6 +102,23 @@ class WPStackSightPlugin {
                 $health['data'][] = $seo_data;
         }
 
+        $backups_dir = WP_PLUGIN_DIR.'/updraftplus';
+        if (is_file($backups_dir.'/updraftplus.php')) {
+            require_once('inc/wp-health-backups.php');
+            require_once($backups_dir.'/restorer.php');
+            require_once($backups_dir.'/options.php');
+
+            if(!$this->health)
+                $this->health = new stdClass;
+
+            $this->health->backups = new WPHealthBackups();
+            if(!isset($health))
+                $health = array();
+
+            if($backups_data = $this->getBackupsData())
+                $health['data'][] = $backups_data;
+        }
+
         if(isset($health['data']) && !empty($health['data'])){
             $this->ss_client->sendHealth($health);
         }
@@ -228,6 +245,38 @@ class WPStackSightPlugin {
             </form>
         </div>
         <?php
+    }
+
+    public function getBackupsData() {
+        if (empty($this->health)) return;
+
+        $returned = false;
+        $general_backups = $this->health->backups->getBackupsData();
+        $widgets = array();
+
+        if(!empty($general_backups)){
+            $widgets[] = array(
+                'type' => "backup",
+                'title' => "Your backups",
+                'desc' => "For information, updates and documentation, please visit the AIO WP Security & Firewall Plugin Page",
+                'group' => 1,
+                'order' => 1,
+                'data' => $general_backups
+            );
+            $returned = true;
+        }
+
+        $data = array(
+            'category' => 'backups',
+            'title' => __('BackupSight'),
+            'desc' => __('For information, updates and documentation, please visit the UpdraftPlus Backup/Restore Plugin Page'),
+            'widgets' => $widgets
+        );
+
+        if($returned){
+            return $data;
+        } else return false;
+
     }
 
     public function getSeoData() {
