@@ -624,6 +624,8 @@ class WPStackSightPlugin {
 
 public function showInstructions($app) {
     $diagnostic = $this->getDiagnostic($app);
+    $app_id = defined('STACKSIGHT_APP_ID') ? STACKSIGHT_APP_ID : 'YOUR_STACKSIGHT_APP_ID';
+    $app_token = defined('STACKSIGHT_TOKEN') ? STACKSIGHT_TOKEN : 'YOUR_STACKSIGHT_TOKEN';
 ?>
 <div class="ss-diagnostic-block">
     <h3><?php echo __('Configuration status', 'stacksight') ?></h3>
@@ -637,15 +639,15 @@ public function showInstructions($app) {
         <?php endif ?>
     </ul>
 </div>
-<?php if ($app && (!defined(STACKSIGHT_APP_ID) || !defined(STACKSIGHT_TOKEN)) && $diagnostic['show_code']): ?>
+<?php if ($app && (!defined('STACKSIGHT_APP_ID') || !defined('STACKSIGHT_TOKEN')) && $diagnostic['show_code']): ?>
 <div class="ss-config-block">
     <p><?php echo __("Insert that code (start - end) at the top of your wp-config.php after a line <strong>".htmlspecialchars('<?php')." </strong>") ?></p>
     <pre class="">
         <span class="code-comments">// StackSight start config</span>
         $ss_inc<span class="code-red"> = </span><span class="code-blue">dirname(__FILE__)</span><span class="code-red"> . </span><span class="code-yellow">'/<?php echo $this->getRelativeRootPath(); ?>stacksight-php-sdk/bootstrap-wp.php'</span>;
         <span class="code-red">if</span>(<span class="code-blue">is_file</span>($ss_inc)) {
-            <span class="code-red">define</span>(<span class="code-yellow">'STACKSIGHT_APP_ID'</span>, '<span class="pre-code-red">YOUR_STACKSIGHT_APP_ID</span>');
-            <span class="code-red">define</span>(<span class="code-yellow">'STACKSIGHT_TOKEN'</span>, '<span class="pre-code-red">YOUR_STACKSIGHT_TOKEN</span>');
+            <span class="code-red">define</span>(<span class="code-yellow">'STACKSIGHT_APP_ID'</span>, '<span class="pre-code-red"><?php echo $app_id?></span>');
+            <span class="code-red">define</span>(<span class="code-yellow">'STACKSIGHT_TOKEN'</span>, '<span class="pre-code-red"><?php echo $app_token?></span>');
             <span class="code-red">require_once</span>($ss_inc);
         } <span class="code-comments">// StackSight end config</span>
     </pre>
