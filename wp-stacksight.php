@@ -639,7 +639,7 @@ public function showInstructions($app) {
         <?php endif ?>
     </ul>
 </div>
-<?php if ($app && (!defined('STACKSIGHT_APP_ID') || !defined('STACKSIGHT_TOKEN')) && $diagnostic['show_code']): ?>
+<?php if ((!defined('STACKSIGHT_APP_ID') || !defined('STACKSIGHT_TOKEN')) && $diagnostic['show_code']): ?>
 <div class="ss-config-block">
     <p><?php echo __("Insert that code (start - end) at the top of your wp-config.php after a line <strong>".htmlspecialchars('<?php')." </strong>") ?></p>
     <pre class="">
