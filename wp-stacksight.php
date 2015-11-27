@@ -66,7 +66,7 @@ class WPStackSightPlugin {
         return $schedules;
     }
 
-    public functioncron_do_main_job () {
+    public function cron_do_main_job () {
         SSUtilities::error_log('cron_do_main_job has been run', 'cron_log');
         // updates
         $updates = array(
