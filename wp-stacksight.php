@@ -3,7 +3,7 @@
  * Plugin Name: Stacksight
  * Plugin URI: http://mean.io
  * Description: Stacksight wordpress support (featuring events, error logs and updates)
- * Version: 1.5.4
+ * Version: 1.6.1
  * Author: Stacksight LTD
  * Author URI: http://stacksight.io
  * License: GPL
@@ -66,7 +66,7 @@ class WPStackSightPlugin {
         return $schedules;
     }
 
-    public function cron_do_main_job() {
+    public functioncron_do_main_job () {
         SSUtilities::error_log('cron_do_main_job has been run', 'cron_log');
         // updates
         $updates = array(
@@ -639,7 +639,7 @@ public function showInstructions($app) {
         <?php endif ?>
     </ul>
 </div>
-<?php if ($app && (!defined('STACKSIGHT_APP_ID') || !defined('STACKSIGHT_TOKEN')) && $diagnostic['show_code']): ?>
+<?php if ((!defined('STACKSIGHT_APP_ID') || !defined('STACKSIGHT_TOKEN')) && $diagnostic['show_code']): ?>
 <div class="ss-config-block">
     <p><?php echo __("Insert that code (start - end) at the top of your wp-config.php after a line <strong>".htmlspecialchars('<?php')." </strong>") ?></p>
     <pre class="">
