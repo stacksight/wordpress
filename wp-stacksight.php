@@ -41,7 +41,10 @@ class WPStackSightPlugin {
         }
 
         if (defined('STACKSIGHT_TOKEN') && defined('STACKSIGHT_BOOTSTRAPED')) {
-            $this->ss_client = new SSWordpressClient(STACKSIGHT_TOKEN, 'wordpress');
+            if(defined('STACKSIGHT_APP_ID'))
+                $this->ss_client = new SSWordpressClient(STACKSIGHT_TOKEN, SSClientBase::PLATFORM_WORDPRESS, STACKSIGHT_APP_ID);
+            else
+                $this->ss_client = new SSWordpressClient(STACKSIGHT_TOKEN, SSClientBase::PLATFORM_WORDPRESS);
             add_filter('cron_schedules', array($this, 'cron_custom_interval'));
             add_action('aal_insert_log', array(&$this, 'insert_log_mean'), 30);
             add_action('stacksight_main_action', array($this, 'cron_do_main_job'));
@@ -65,7 +68,7 @@ class WPStackSightPlugin {
         return $schedules;
     }
 
-    public function cron_do_main_job () {
+    public function cron_do_main_job() {
         SSUtilities::error_log('cron_do_main_job has been run', 'cron_log');
         // updates
         $updates = array(
@@ -117,7 +120,6 @@ class WPStackSightPlugin {
             if($backups_data = $this->getBackupsData())
                 $health['data'][] = $backups_data;
         }
-
         if(isset($health['data']) && !empty($health['data'])){
             $this->ss_client->sendHealth($health);
         }
@@ -361,7 +363,7 @@ class WPStackSightPlugin {
         if (!empty($critical_features)) {
             $data['widgets'][] = array(
                 'type' => 'checklist',
-                'title' => __('Critical Features Status'), 
+                'title' => __('Critical Features Status'),
                 'desc' => __('Below is the current status of the critical features that you should activate on your site to achieve a minimum level of recommended security','all-in-one-wp-security-and-firewall'),
                 'order' => 2,       // specifies the block sequence (the place in DOM). Optinal
                 'group' => 1,       // specifies the group where the widget will be rendered.
@@ -463,7 +465,18 @@ class WPStackSightPlugin {
             null, // Title
             null, // Callback
             'stacksight-set-admin' // Page
-        );  
+        );
+
+        if(defined('STACKSIGHT_APP_ID')){
+            add_settings_field(
+                'appId',
+                'Application ID',
+                array( $this, 'appId_callback' ),
+                'stacksight-set-admin',
+                'setting_section_stacksight'
+            );
+        }
+
         add_settings_field(
             'token',
             'Access Token',
@@ -498,6 +511,14 @@ class WPStackSightPlugin {
         wp_schedule_event(time(), 'updates_interval', 'stacksight_main_action');
 
         return $new_input;
+    }
+
+    public function appId_callback() {
+        if(defined('STACKSIGHT_TOKEN')){
+            printf(
+                '<span>'.STACKSIGHT_APP_ID.'</span>'
+            );
+        }
     }
 
     public function token_callback() {
