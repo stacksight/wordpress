@@ -40,9 +40,11 @@ class WPStackSightPlugin {
             add_filter( 'plugin_action_links_' . plugin_basename(__FILE__), array($this, 'stacksight_plugin_action_links'));
         }
 
-        if (defined('STACKSIGHT_APP_ID') && defined('STACKSIGHT_TOKEN') && defined('STACKSIGHT_BOOTSTRAPED')) {
-            $this->ss_client = new SSWordpressClient(STACKSIGHT_TOKEN, 'wordpress');
-            $this->ss_client->initApp(STACKSIGHT_APP_ID);
+        if (defined('STACKSIGHT_TOKEN') && defined('STACKSIGHT_BOOTSTRAPED')) {
+            if(defined('STACKSIGHT_APP_ID'))
+                $this->ss_client = new SSWordpressClient(STACKSIGHT_TOKEN, SSClientBase::PLATFORM_WORDPRESS, STACKSIGHT_APP_ID);
+            else
+                $this->ss_client = new SSWordpressClient(STACKSIGHT_TOKEN, SSClientBase::PLATFORM_WORDPRESS);
             add_filter('cron_schedules', array($this, 'cron_custom_interval'));
             add_action('aal_insert_log', array(&$this, 'insert_log_mean'), 30);
             add_action('stacksight_main_action', array($this, 'cron_do_main_job'));
@@ -66,7 +68,7 @@ class WPStackSightPlugin {
         return $schedules;
     }
 
-    public function cron_do_main_job () {
+    public function cron_do_main_job() {
         SSUtilities::error_log('cron_do_main_job has been run', 'cron_log');
         // updates
         $updates = array(
@@ -118,7 +120,6 @@ class WPStackSightPlugin {
             if($backups_data = $this->getBackupsData())
                 $health['data'][] = $backups_data;
         }
-
         if(isset($health['data']) && !empty($health['data'])){
             $this->ss_client->sendHealth($health);
         }
@@ -269,7 +270,7 @@ class WPStackSightPlugin {
 
         $data = array(
             'category' => 'backups',
-            'title' => __('BackupSight'),
+            'title' => __('Backups'),
             'desc' => __('For information, updates and documentation, please visit the UpdraftPlus Backup/Restore Plugin Page'),
             'widgets' => $widgets
         );
@@ -339,7 +340,7 @@ class WPStackSightPlugin {
 
         $data = array(
             'category' => 'security',
-            'title' => __('Security summary'),
+            'title' => __('Security'),
             'desc' => __('This panel shows the summary how your site is secure (according to the All In One Security And Firewall plugin)'),
             'plugin_url' => site_url('wp-admin/admin.php?page='.AIOWPSEC_MAIN_MENU_SLUG)
         );
@@ -362,7 +363,7 @@ class WPStackSightPlugin {
         if (!empty($critical_features)) {
             $data['widgets'][] = array(
                 'type' => 'checklist',
-                'title' => __('Critical Features Status'), 
+                'title' => __('Critical Features Status'),
                 'desc' => __('Below is the current status of the critical features that you should activate on your site to achieve a minimum level of recommended security','all-in-one-wp-security-and-firewall'),
                 'order' => 2,       // specifies the block sequence (the place in DOM). Optinal
                 'group' => 1,       // specifies the group where the widget will be rendered.
@@ -464,14 +465,18 @@ class WPStackSightPlugin {
             null, // Title
             null, // Callback
             'stacksight-set-admin' // Page
-        );  
-        add_settings_field(
-            '_id',
-            'App ID',
-            array( $this, 'app_id_callback' ),
-            'stacksight-set-admin',
-            'setting_section_stacksight'
         );
+
+        if(defined('STACKSIGHT_APP_ID')){
+            add_settings_field(
+                'appId',
+                'Application ID',
+                array( $this, 'appId_callback' ),
+                'stacksight-set-admin',
+                'setting_section_stacksight'
+            );
+        }
+
         add_settings_field(
             'token',
             'Access Token',
@@ -508,15 +513,8 @@ class WPStackSightPlugin {
         return $new_input;
     }
 
-    /** 
-     * Get the settings option array and print one of its values
-     */
-    public function app_id_callback() {
-        if(!defined('STACKSIGHT_APP_ID')){
-            printf(
-                '<span class="pre-code-red"> Not set </span>'
-            );
-        } else {
+    public function appId_callback() {
+        if(defined('STACKSIGHT_TOKEN')){
             printf(
                 '<span>'.STACKSIGHT_APP_ID.'</span>'
             );
@@ -601,10 +599,7 @@ class WPStackSightPlugin {
             $list[] = __('-- Tokens do not match', 'stacksight').'<br>';
             $show_code = true;
         }
-        if (!defined('STACKSIGHT_APP_ID')) {
-            $list[] = __('-- App Ids do not match', 'stacksight');
-            $show_code = true;
-        }
+    
         if (!defined('STACKSIGHT_BOOTSTRAPED') || $list) {
             $list[] = __('wp-config.php is not configured as specified above', 'stacksight').'<br>';
             $show_code = true;
@@ -624,7 +619,6 @@ class WPStackSightPlugin {
 
 public function showInstructions($app) {
     $diagnostic = $this->getDiagnostic($app);
-    $app_id = defined('STACKSIGHT_APP_ID') ? STACKSIGHT_APP_ID : 'YOUR_STACKSIGHT_APP_ID';
     $app_token = defined('STACKSIGHT_TOKEN') ? STACKSIGHT_TOKEN : 'YOUR_STACKSIGHT_TOKEN';
 ?>
 <div class="ss-diagnostic-block">
@@ -639,14 +633,13 @@ public function showInstructions($app) {
         <?php endif ?>
     </ul>
 </div>
-<?php if ((!defined('STACKSIGHT_APP_ID') || !defined('STACKSIGHT_TOKEN')) && $diagnostic['show_code']): ?>
+<?php if (!defined('STACKSIGHT_TOKEN') && $diagnostic['show_code']): ?>
 <div class="ss-config-block">
     <p><?php echo __("Insert that code (start - end) at the top of your wp-config.php after a line <strong>".htmlspecialchars('<?php')." </strong>") ?></p>
     <pre class="">
         <span class="code-comments">// StackSight start config</span>
         $ss_inc<span class="code-red"> = </span><span class="code-blue">dirname(__FILE__)</span><span class="code-red"> . </span><span class="code-yellow">'/<?php echo $this->getRelativeRootPath(); ?>stacksight-php-sdk/bootstrap-wp.php'</span>;
         <span class="code-red">if</span>(<span class="code-blue">is_file</span>($ss_inc)) {
-            <span class="code-red">define</span>(<span class="code-yellow">'STACKSIGHT_APP_ID'</span>, '<span class="pre-code-red"><?php echo $app_id?></span>');
             <span class="code-red">define</span>(<span class="code-yellow">'STACKSIGHT_TOKEN'</span>, '<span class="pre-code-red"><?php echo $app_token?></span>');
             <span class="code-red">require_once</span>($ss_inc);
         } <span class="code-comments">// StackSight end config</span>
