@@ -20,8 +20,6 @@ class WPHealthSeo
             $wpdb->prepare($sql, WPSEO_Meta::$meta_prefix.'linkdex', WPSEO_Meta::$meta_prefix.'meta-robots-noindex', 'post', 'publish')
         );
 
-        print_r($posts);
-
         if(!$posts)
             return false;
 
