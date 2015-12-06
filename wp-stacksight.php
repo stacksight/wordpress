@@ -40,6 +40,8 @@ class WPStackSightPlugin {
             add_filter( 'plugin_action_links_' . plugin_basename(__FILE__), array($this, 'stacksight_plugin_action_links'));
         }
 
+        $this->_setUpMultidomainsConfig(array('STACKSIGHT_APP_ID', 'STACKSIGHT_TOKEN'));
+
         if (defined('STACKSIGHT_TOKEN') && defined('STACKSIGHT_BOOTSTRAPED')) {
             if(defined('STACKSIGHT_APP_ID'))
                 $this->ss_client = new SSWordpressClient(STACKSIGHT_TOKEN, SSClientBase::PLATFORM_WORDPRESS, STACKSIGHT_APP_ID);
@@ -48,6 +50,20 @@ class WPStackSightPlugin {
             add_filter('cron_schedules', array($this, 'cron_custom_interval'));
             add_action('aal_insert_log', array(&$this, 'insert_log_mean'), 30);
             add_action('stacksight_main_action', array($this, 'cron_do_main_job'));
+        }
+    }
+
+    private function _setUpMultidomainsConfig($params = array()){
+        if($params && is_array($params)){
+            foreach($params as $param){
+                if (is_multisite()) {
+                    global $blog_id;
+                    $constant = 'WP_' . $blog_id . '_' . $param;
+                    if (defined($constant)){
+                        define($param, untrailingslashit(constant($constant)));
+                    }
+                }
+            }
         }
     }
 
