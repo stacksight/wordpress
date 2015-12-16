@@ -139,6 +139,11 @@ class WPStackSightPlugin {
             $this->ss_client->sendHealth($health);
         }
 
+        $inventory = $this->getInveroment();
+        if(!empty($inventory)){
+            $this->ss_client->sendInventory($health);
+        }
+
     }
 
     public function insert_log_mean($args) {
@@ -236,6 +241,43 @@ class WPStackSightPlugin {
             '', 
             '80.2'
         );
+    }
+
+    public function getInveroment(){
+        $object_plugins = get_plugins();
+        $object_themes = get_themes();
+        $plugins = array();
+        $themes = array();
+
+        if($object_plugins && is_array($object_plugins)){
+            foreach($object_plugins as $path => $plugin){
+                $plugins[] = array(
+                    'type' => SSWordpressClient::TYPE_PLUGIN,
+                    'name' => ($plugin['TextDomain']) ? $plugin['TextDomain'] : basename($path),
+                    'version' => $plugin['Version'],
+                    'label' => $plugin['Name'],
+                    'description' => $plugin['Description'],
+                    'active' => (is_plugin_active($path)) ? true : false,
+                    'requires' => array()
+                );
+            }
+        }
+
+        if($object_themes && is_array($object_themes)){
+            foreach($object_themes as $theme_name => $theme){
+                $themes[] = array(
+                    'type' => SSWordpressClient::TYPE_THEME,
+                    'name' => $theme->get('TextDomain'),
+                    'version' => $theme->get('Version'),
+                    'label' => $theme->get('Name'),
+                    'description' => $theme->get('Description'),
+                    'active' => ($theme->get('Status') == 'publish') ? true : false,
+                    'requires' => array()
+                );
+            }
+        }
+
+        return array_merge($themes, $plugins);
     }
 
     /**
