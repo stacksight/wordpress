@@ -139,7 +139,7 @@ class WPStackSightPlugin {
             $this->ss_client->sendHealth($health);
         }
 
-        $inventory = $this->getInveroment();
+        $inventory = $this->getInventory();
         if(!empty($inventory)){
             $this->ss_client->sendInventory($health);
         }
@@ -243,7 +243,7 @@ class WPStackSightPlugin {
         );
     }
 
-    public function getInveroment(){
+    public function getInventory(){
         $object_plugins = get_plugins();
         $object_themes = get_themes();
         $plugins = array();
