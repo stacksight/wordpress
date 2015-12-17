@@ -141,7 +141,10 @@ class WPStackSightPlugin {
 
         $inventory = $this->getInventory();
         if(!empty($inventory)){
-            $this->ss_client->sendInventory($health);
+            $data = array(
+                'data' => $inventory
+            );
+            $this->ss_client->sendInventory($data);
         }
 
     }
