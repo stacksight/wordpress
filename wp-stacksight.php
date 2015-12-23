@@ -3,7 +3,7 @@
  * Plugin Name: Stacksight
  * Plugin URI: http://mean.io
  * Description: Stacksight wordpress support (featuring events, error logs and updates)
- * Version: 1.6.4
+ * Version: 1.7.0
  * Author: Stacksight LTD
  * Author URI: http://stacksight.io
  * License: GPL
@@ -40,14 +40,29 @@ class WPStackSightPlugin {
             add_filter( 'plugin_action_links_' . plugin_basename(__FILE__), array($this, 'stacksight_plugin_action_links'));
         }
 
+        $this->_setUpMultidomainsConfig(array('STACKSIGHT_APP_ID', 'STACKSIGHT_TOKEN', 'STACKSIGHT_GROUP'));
+
         if (defined('STACKSIGHT_TOKEN') && defined('STACKSIGHT_BOOTSTRAPED')) {
-            if(defined('STACKSIGHT_APP_ID'))
-                $this->ss_client = new SSWordpressClient(STACKSIGHT_TOKEN, SSClientBase::PLATFORM_WORDPRESS, STACKSIGHT_APP_ID);
-            else
-                $this->ss_client = new SSWordpressClient(STACKSIGHT_TOKEN, SSClientBase::PLATFORM_WORDPRESS);
+            $app_id = (defined('STACKSIGHT_APP_ID')) ?  STACKSIGHT_APP_ID : false;
+            $group = (defined('STACKSIGHT_GROUP')) ?  STACKSIGHT_GROUP : false;
+            $this->ss_client = new SSWordpressClient(STACKSIGHT_TOKEN, SSClientBase::PLATFORM_WORDPRESS, $app_id, $group);
             add_filter('cron_schedules', array($this, 'cron_custom_interval'));
             add_action('aal_insert_log', array(&$this, 'insert_log_mean'), 30);
             add_action('stacksight_main_action', array($this, 'cron_do_main_job'));
+        }
+    }
+
+    private function _setUpMultidomainsConfig($params = array()){
+        if($params && is_array($params)){
+            foreach($params as $param){
+                if (is_multisite()) {
+                    global $blog_id;
+                    $constant = 'WP_' . $blog_id . '_' . $param;
+                    if (defined($constant)){
+                        define($param, untrailingslashit(constant($constant)));
+                    }
+                }
+            }
         }
     }
 
@@ -484,6 +499,15 @@ class WPStackSightPlugin {
             'stacksight-set-admin',
             'setting_section_stacksight'
         );
+
+        add_settings_field(
+            'group',
+            'Application group',
+            array( $this, 'group_callback' ),
+            'stacksight-set-admin',
+            'setting_section_stacksight'
+        );
+
         add_settings_field(
             'cron_updates_interval', 
             'Cron updates interval', 
@@ -529,6 +553,18 @@ class WPStackSightPlugin {
         } else {
             printf(
                 '<span>'.STACKSIGHT_TOKEN.'</span>'
+            );
+        }
+    }
+
+    public function group_callback(){
+        if(!defined('STACKSIGHT_GROUP')){
+            printf(
+                '<span class=""> Not set </span>'
+            );
+        } else {
+            printf(
+                '<span>'.STACKSIGHT_GROUP.'</span>'
             );
         }
     }

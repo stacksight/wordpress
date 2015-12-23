@@ -26,27 +26,24 @@ class WPHealthSeo
         $results = array();
         $results['good'] = array();
         $results['ok'] = array();
-        $results['poor'] = array();
         $results['bad'] = array();
         $results['no_focus'] = array();
         $results['no_index'] = array();
         foreach($posts as $post){
             if(isset($post->meta_key) && $post->meta_key){
-
                 switch ($post->meta_key){
                     case  WPSEO_Meta::$meta_prefix.'linkdex':
-                        if(!isset($post->meta_value) || empty($post->meta_value) || $post->meta_value == 0 || $post->meta_value < 35){
+                        if(!isset($post->meta_value) || empty($post->meta_value) || ($post->meta_value > 0 && $post->meta_value < 41)){
                             $results['bad'][] = $this->_addElement($post);
-                        } elseif($post->meta_value >= 35 && $post->meta_value < 55){
-                            $results['poor'][] = $this->_addElement($post);
-                        } elseif($post->meta_value >= 55 && $post->meta_value < 75){
+                        } elseif($post->meta_value >= 41 && $post->meta_value < 71){
                             $results['ok'][] = $this->_addElement($post);
-                        }elseif($post->meta_value >= 75 && $post->meta_value < 100){
+                        } elseif($post->meta_value >= 71){
                             $results['good'][] = $this->_addElement($post);
                         }
                         break;
                     case WPSEO_Meta::$meta_prefix.'meta-robots-noindex':
                         $results['no_index'][] = $this->_addElement($post);
+                        $results['no_focus'][] = $this->_addElement($post);
                         break;
                 }
             } else{
