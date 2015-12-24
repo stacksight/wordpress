@@ -3,7 +3,7 @@
  * Plugin Name: Stacksight
  * Plugin URI: http://mean.io
  * Description: Stacksight wordpress support (featuring events, error logs and updates)
- * Version: 1.7.0
+ * Version: 1.7.1
  * Author: Stacksight LTD
  * Author URI: http://stacksight.io
  * License: GPL
@@ -138,7 +138,7 @@ class WPStackSightPlugin {
         if(isset($health['data']) && !empty($health['data'])){
             $this->ss_client->sendHealth($health);
         }
-
+        /*
         $inventory = $this->getInventory();
         if(!empty($inventory)){
             $data = array(
@@ -146,7 +146,7 @@ class WPStackSightPlugin {
             );
             $this->ss_client->sendInventory($data);
         }
-
+        */
     }
 
     public function insert_log_mean($args) {
