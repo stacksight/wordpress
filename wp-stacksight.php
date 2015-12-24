@@ -138,7 +138,7 @@ class WPStackSightPlugin {
         if(isset($health['data']) && !empty($health['data'])){
             $this->ss_client->sendHealth($health);
         }
-
+        /*
         $inventory = $this->getInventory();
         if(!empty($inventory)){
             $data = array(
@@ -146,7 +146,7 @@ class WPStackSightPlugin {
             );
             $this->ss_client->sendInventory($data);
         }
-
+        */
     }
 
     public function insert_log_mean($args) {
