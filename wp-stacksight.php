@@ -139,12 +139,14 @@ class WPStackSightPlugin {
             $this->ss_client->sendHealth($health, true);
         }
 
-        $inventory = $this->getInventory();
-        if(!empty($inventory)){
-            $data = array(
-                'data' => $inventory
-            );
-            $this->ss_client->sendInventory($data, true);
+        if(defined('STACKSIGHT_INCLUDE_INVENTORY') && STACKSIGHT_INCLUDE_INVENTORY == true){
+            $inventory = $this->getInventory();
+            if(!empty($inventory)){
+                $data = array(
+                    'data' => $inventory
+                );
+                $this->ss_client->sendInventory($data, true);
+            }
         }
 
         $this->ss_client->sendMultiCURL();
