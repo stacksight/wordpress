@@ -3,7 +3,7 @@
  * Plugin Name: Stacksight
  * Plugin URI: http://mean.io
  * Description: Stacksight wordpress support (featuring events, error logs and updates)
- * Version: 1.7.5
+ * Version: 1.7.6
  * Author: Stacksight LTD
  * Author URI: http://stacksight.io
  * License: GPL
