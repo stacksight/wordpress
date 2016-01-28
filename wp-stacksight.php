@@ -3,7 +3,7 @@
  * Plugin Name: Stacksight
  * Plugin URI: http://mean.io
  * Description: Stacksight wordpress support (featuring events, error logs and updates)
- * Version: 1.7.6
+ * Version: 1.7.7
  * Author: Stacksight LTD
  * Author URI: http://stacksight.io
  * License: GPL
@@ -89,7 +89,7 @@ class WPStackSightPlugin {
         $updates = array(
             'data' => $this->get_update_info()
         );
-        $this->ss_client->sendUpdates($updates);
+        $this->ss_client->sendUpdates($updates, true);
 
         // health, include health security class if All in One Security plugin exists
         $all_in_one_dir = WP_PLUGIN_DIR.'/all-in-one-wp-security-and-firewall';
