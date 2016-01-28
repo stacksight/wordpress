@@ -89,7 +89,7 @@ class WPStackSightPlugin {
         $updates = array(
             'data' => $this->get_update_info()
         );
-        $this->ss_client->sendUpdates($updates);
+        $this->ss_client->sendUpdates($updates, true);
 
         // health, include health security class if All in One Security plugin exists
         $all_in_one_dir = WP_PLUGIN_DIR.'/all-in-one-wp-security-and-firewall';
