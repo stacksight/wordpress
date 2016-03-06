@@ -12,6 +12,8 @@ class WPHealthBackups
         'db'
     );
 
+    public $last_months = 1;
+
     public function getBackupsData(){
         $backup_list = UpdraftPlus_Options::get_updraft_option('updraft_backup_history');
         if (empty($backup_list)) return;
@@ -19,6 +21,11 @@ class WPHealthBackups
         $backups = array();
 
         foreach($backup_list as $timestamp => $backups_info){
+            $time_mm =  strtotime("+$this->last_months month");
+            // If date more than 1 month - skip it
+            if(date('Y-m-d', $timestamp) < date('Y-m-d', $time_mm))
+                continue;
+
             $this->backups_size = 0;
             $this->backup_files = array();
             $destinations = array();
