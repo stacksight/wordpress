@@ -3,7 +3,7 @@
  * Plugin Name: Stacksight
  * Plugin URI: http://mean.io
  * Description: Stacksight wordpress support (featuring events, error logs and updates)
- * Version: 1.7.12
+ * Version: 1.7.13
  * Author: Stacksight LTD
  * Author URI: http://stacksight.io
  * License: GPL
@@ -290,16 +290,15 @@ class WPStackSightPlugin {
      * Options page callback
      */
     public function create_admin_page() {
-        $this->cron_do_main_job();
         ?>
-        <div class="ss-wrap">
+        <div class="ss-wrap wrap">
             <h2>App setting for StackSight</h2>
             <form method="post" action="options.php">
             <?php
                 // This prints out all hidden setting fields
-                settings_fields( 'stacksight_option_group' );   
+                settings_fields( 'stacksight_option_group' );
                 do_settings_sections( 'stacksight-set-admin' );
-                // show code instructions block
+//                 show code instructions block
                 $app_settings = get_option('stacksight_opt');
                 $this->showInstructions($app_settings);
 
@@ -681,7 +680,7 @@ class WPStackSightPlugin {
         $show_code = false;
 
         if (!defined('STACKSIGHT_TOKEN')) {
-            $list[] = __('-- Tokens do not match', 'stacksight').'<br>';
+            $list[] = __('Tokens do not match', 'stacksight').'<br>';
             $show_code = true;
         }
     
@@ -706,30 +705,35 @@ public function showInstructions($app) {
     $diagnostic = $this->getDiagnostic($app);
     $app_token = defined('STACKSIGHT_TOKEN') ? STACKSIGHT_TOKEN : 'YOUR_STACKSIGHT_TOKEN';
 ?>
-<div class="ss-diagnostic-block">
-    <h3><?php echo __('Configuration status', 'stacksight') ?></h3>
-    <ul class="ss-config-diagnostic">
-        <?php if ($diagnostic['list']): ?>
-            <?php foreach ($diagnostic['list'] as $d_item): ?>
-                <li><?php echo $d_item ?></li>
-            <?php endforeach ?>
-        <?php else: ?>
-            <h4 class="ss-ok">OK</h4>
-        <?php endif ?>
-    </ul>
-</div>
-<?php if (!defined('STACKSIGHT_TOKEN') && $diagnostic['show_code']): ?>
-<div class="ss-config-block">
-    <p><?php echo __("Insert that code (start - end) at the top of your wp-config.php after a line <strong>".htmlspecialchars('<?php')." </strong>") ?></p>
-    <pre class="">
-        <span class="code-comments">// StackSight start config</span>
-        $ss_inc<span class="code-red"> = </span><span class="code-blue">dirname(__FILE__)</span><span class="code-red"> . </span><span class="code-yellow">'/<?php echo $this->getRelativeRootPath(); ?>stacksight-php-sdk/bootstrap-wp.php'</span>;
-        <span class="code-red">if</span>(<span class="code-blue">is_file</span>($ss_inc)) {
-            <span class="code-red">define</span>(<span class="code-yellow">'STACKSIGHT_TOKEN'</span>, '<span class="pre-code-red"><?php echo $app_token?></span>');
-            <span class="code-red">require_once</span>($ss_inc);
-        } <span class="code-comments">// StackSight end config</span>
-    </pre>
-</div>
+    <div class="ss-diagnostic-block">
+        <h3><?php echo __('Configuration status', 'stacksight') ?></h3>
+        <ul class="ss-config-diagnostic <?php echo (($diagnostic['list']))? 'error' : 'success'?>">
+            <?php if ($diagnostic['list']): ?>
+                <?php foreach ($diagnostic['list'] as $d_item): ?>
+                    <li><?php echo $d_item ?></li>
+                <?php endforeach ?>
+            <?php else: ?>
+                <h4 class="ss-ok">OK</h4>
+            <?php endif ?>
+        </ul>
+    </div>
+    <?php if (!defined('STACKSIGHT_TOKEN') && $diagnostic['show_code']): ?>
+    <div class="ss-config-block">
+        <p><?php echo __("Insert that code (start - end) at the top of your wp-config.php after a line <strong>".htmlspecialchars('<?php')." </strong>") ?></p>
+        <div class="class-code">
+            <div class="code-comments">// StackSight start config</div>
+            <div class="">
+                <div>$ss_inc<span class=""> = </span><span class="">dirname(__FILE__)</span><span class=""> . </span><span class="">'/<?php echo $this->getRelativeRootPath(); ?>stacksight-php-sdk/bootstrap-wp.php'</span>;</div>
+                <div><span class="">if</span>(<span class="">is_file</span>($ss_inc)) {</div>
+                <div class="tab">
+                    <div><span class="">define</span>(<span class="">'STACKSIGHT_TOKEN'</span>, '<span class="code-yellow"><?php echo $app_token?></span>');</div>
+                    <div><span class="">require_once</span>($ss_inc);</div>
+                </div>
+                }
+            </div>
+            <div class="code-comments">// StackSight end config</div>
+        </div>
+    </div>
 <?php endif;
     }
 
