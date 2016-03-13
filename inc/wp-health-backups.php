@@ -19,9 +19,8 @@ class WPHealthBackups
         if (empty($backup_list)) return;
 
         $backups = array();
-
         foreach($backup_list as $timestamp => $backups_info){
-            $time_mm =  strtotime("+$this->last_months month");
+            $time_mm =  strtotime("-$this->last_months month");
             // If date more than 1 month - skip it
             if(date('Y-m-d', $timestamp) < date('Y-m-d', $time_mm))
                 continue;
