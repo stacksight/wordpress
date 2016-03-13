@@ -10,8 +10,8 @@ class WPHealthSeo
     {
         global $wpdb;
         $sql = "SELECT p.id, p.post_title, pm.meta_value, pm.meta_key
-        FROM ch_posts p
-        LEFT JOIN ch_postmeta pm ON (pm.post_id = p.ID AND (pm.meta_key = '%s' OR pm.meta_key = '%s'))
+        FROM ".$wpdb->prefix."posts p
+        LEFT JOIN ".$wpdb->prefix."postmeta pm ON (pm.post_id = p.ID AND (pm.meta_key = '%s' OR pm.meta_key = '%s'))
         WHERE p.post_type = '%s' AND p.post_status = '%s'
         GROUP BY p.ID
         ORDER BY p.post_date DESC";
