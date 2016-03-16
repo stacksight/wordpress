@@ -54,3 +54,11 @@
 .screen-of-config{
     text-align: center;
 }
+
+.health_features_option{
+    clear: both;
+}
+.health_features_option .checkbox{
+    width: 40px;
+    float:left;
+}

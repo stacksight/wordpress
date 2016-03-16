@@ -11,6 +11,7 @@
 
 defined('ABSPATH') or die("No script kiddies please!");
 
+require_once('texts.php');
 require_once('stacksight-php-sdk/SSUtilities.php');
 require_once('stacksight-php-sdk/SSClientBase.php');
 require_once('stacksight-php-sdk/SSHttpRequest.php');
@@ -753,7 +754,11 @@ class WPStackSightPlugin {
         if(isset($this->options_features['include_logs']) && $this->options_features['include_logs'] == true){
             $checked = 'checked';
         }
-        printf('<div><input type="checkbox" name="stacksight_opt_features[include_logs]" id="enable_features_logs" '.$checked.' /></div>');
+        $description = '';
+        if(defined('stacksight_logs_text')){
+            $description = stacksight_logs_text;
+        }
+        printf('<div class="health_features_option"><div class="checkbox"><input type="checkbox" name="stacksight_opt_features[include_logs]" id="enable_features_logs" '.$checked.' /></div>'.$description.'</div>');
     }
 
     public function include_health_callback(){
@@ -761,7 +766,11 @@ class WPStackSightPlugin {
         if(isset($this->options_features['include_health']) && $this->options_features['include_health'] == true){
             $checked = 'checked';
         }
-        printf('<div><input type="checkbox" name="stacksight_opt_features[include_health]" id="enable_features_health" '.$checked.' /></div>');
+        $description = '';
+        if(defined('stacksight_health_text')){
+            $description = stacksight_health_text;
+        }
+        printf('<div class="health_features_option"><div class="checkbox"><input type="checkbox" name="stacksight_opt_features[include_health]" id="enable_features_health" '.$checked.' /></div>'.$description.'</div>');
     }
 
     public function include_inventory_callback(){
@@ -769,7 +778,11 @@ class WPStackSightPlugin {
         if(isset($this->options_features['include_inventory']) && $this->options_features['include_inventory'] == true){
             $checked = 'checked';
         }
-        printf('<div><input type="checkbox" name="stacksight_opt_features[include_inventory]" id="enable_features_inventory" '.$checked.' /></div>');
+        $description = '';
+        if(defined('stacksight_inventory_text')){
+            $description = stacksight_inventory_text;
+        }
+        printf('<div class="health_features_option"><div class="checkbox"><input type="checkbox" name="stacksight_opt_features[include_inventory]" id="enable_features_inventory" '.$checked.' /></div>'.$description.'</div>');
     }
 
     public function include_updates_callback(){
@@ -777,7 +790,11 @@ class WPStackSightPlugin {
         if(isset($this->options_features['include_updates']) && $this->options_features['include_updates'] == true){
             $checked = 'checked';
         }
-        printf('<div><input type="checkbox" name="stacksight_opt_features[include_updates]" id="enable_features_events" '.$checked.' /></div>');
+        $description = '';
+        if(defined('stacksight_updates_text')){
+            $description = stacksight_updates_text;
+        }
+        printf('<div class="health_features_option"><div class="checkbox"><input type="checkbox" name="stacksight_opt_features[include_updates]" id="enable_features_events" '.$checked.' /></div>'.$description.'</div>');
     }
 
     public function include_events_callback(){
@@ -785,7 +802,11 @@ class WPStackSightPlugin {
         if(isset($this->options_features['include_events']) && $this->options_features['include_events'] == true){
             $checked = 'checked';
         }
-        printf('<div><input type="checkbox" name="stacksight_opt_features[include_events]" id="enable_features_events" '.$checked.' /></div>');
+        $description = '';
+        if(defined('stacksight_events_text')){
+            $description = stacksight_events_text;
+        }
+        printf('<div class="health_features_option"><div class="checkbox"><input type="checkbox" name="stacksight_opt_features[include_events]" id="enable_features_events" '.$checked.' /></div>'.$description.'</div>');
     }
 
     public function slack_url_callback() {
