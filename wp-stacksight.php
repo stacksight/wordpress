@@ -586,37 +586,46 @@ class WPStackSightPlugin {
             'stacksight-set-admin' // Page
         );
 
+        $title = (defined('stacksight_logs_title')) ? stacksight_logs_title : 'Include Logs';
         add_settings_field(
             'include_logs',
-            'Include Logs',
+            $title,
             array( $this, 'include_logs_callback' ),
             'stacksight-set-features',
             'setting_section_stacksight'
         );
+
+        $title = (defined('stacksight_health_title')) ? stacksight_health_title : 'Include Health';
         add_settings_field(
             'include_health',
-            'Include Health',
+            $title,
             array( $this, 'include_health_callback' ),
             'stacksight-set-features',
             'setting_section_stacksight'
         );
+
+        $title = (defined('stacksight_inventory_title')) ? stacksight_inventory_title : 'Include Inventory';
         add_settings_field(
             'include_inventory',
-            'Include Inventory',
+            $title,
             array( $this, 'include_inventory_callback' ),
             'stacksight-set-features',
             'setting_section_stacksight'
         );
+
+        $title = (defined('stacksight_events_title')) ? stacksight_events_title : 'Include Events';
         add_settings_field(
             'include_events',
-            'Include Events',
+            $title,
             array( $this, 'include_events_callback' ),
             'stacksight-set-features',
             'setting_section_stacksight'
         );
+
+        $title = (defined('stacksight_updates_title')) ? stacksight_updates_title : 'Include Updates';
         add_settings_field(
             'include_updates',
-            'Include Updates',
+            $title,
             array( $this, 'include_updates_callback' ),
             'stacksight-set-features',
             'setting_section_stacksight'
