@@ -960,7 +960,7 @@ class WPStackSightPlugin {
         }
     
         if (!defined('STACKSIGHT_BOOTSTRAPED') || $list) {
-            $list[] = __('wp-config.php is not configured as specified above', 'stacksight').'<br>';
+            $list[] = __('wp-config.php is not configured as specified below', 'stacksight').'<br>';
             $show_code = true;
         }
 
