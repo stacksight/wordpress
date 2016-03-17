@@ -955,7 +955,7 @@ class WPStackSightPlugin {
         $show_code = false;
 
         if (!defined('STACKSIGHT_TOKEN')) {
-            $list[] = __('Tokens do not match', 'stacksight').'<br>';
+            $list[] = __('Token doesn\'t exist', 'stacksight').'<br>';
             $show_code = true;
         }
     
