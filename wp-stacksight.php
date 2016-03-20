@@ -514,9 +514,9 @@ class WPStackSightPlugin {
                 'type' => 'theme',
                 'status' => 5, // 5 means new update is available
                 'description' => isset($uitem->update['upgrade_notice']) ? $uitem->update['upgrade_notice'] : '',
-                'link' => $uitem->update->url,
+                'link' => (isset($uitem->update->url)) ? $uitem->update->url : '',
                 'release_link' => 'https://themes.trac.wordpress.org/log/'.$theme,
-                'download_link' => $uitem->update->package,
+                'download_link' => (isset($uitem->update->package)) ? $uitem->update->package : '',
                 'update_link' => site_url('wp-admin/update-core.php'),
             );
         }
