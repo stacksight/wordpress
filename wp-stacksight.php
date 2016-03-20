@@ -3,7 +3,7 @@
  * Plugin Name: Stacksight
  * Plugin URI: http://mean.io
  * Description: Stacksight wordpress support (featuring events, error logs and updates)
- * Version: 1.7.15
+ * Version: 1.8.0
  * Author: Stacksight LTD
  * Author URI: http://stacksight.io
  * License: GPL
@@ -11,6 +11,7 @@
 
 defined('ABSPATH') or die("No script kiddies please!");
 
+require_once('texts.php');
 require_once('stacksight-php-sdk/SSUtilities.php');
 require_once('stacksight-php-sdk/SSClientBase.php');
 require_once('stacksight-php-sdk/SSHttpRequest.php');
@@ -20,6 +21,8 @@ class WPStackSightPlugin {
 
     public $ss_client;
     private $options;
+    private $options_slack;
+    private $options_features;
     private $health;
     private $dep_plugins = array(
         'aryo-activity-log/aryo-activity-log.php' => array(
@@ -84,59 +87,67 @@ class WPStackSightPlugin {
     }
 
     public function cron_do_main_job() {
+        if(!defined('STACKSIGHT_TOKEN'))
+            return;
+
         SSUtilities::error_log('cron_do_main_job has been run', 'cron_log');
         // updates
-        $updates = array(
-            'data' => $this->get_update_info()
-        );
-        $this->ss_client->sendUpdates($updates, true);
-
-        // health, include health security class if All in One Security plugin exists
-        $all_in_one_dir = WP_PLUGIN_DIR.'/all-in-one-wp-security-and-firewall';
-        if (is_file($all_in_one_dir.'/wp-security-core.php')) {
-            require_once($all_in_one_dir.'/wp-security-core.php');
-            require_once($all_in_one_dir.'/admin/wp-security-admin-init.php');
-            require_once('inc/wp-health-security.php');
-            // echo '<pre>'.print_r($GLOBALS['aio_wp_security'], true).'</pre>';
-            $this->health = new stdClass;
-            $this->health->security = new WPHealthSecurity();
-            $health = array();
-            $health['data'][] = $this->getSecurityData();
+        if(defined('STACKSIGHT_INCLUDE_UPDATES') && STACKSIGHT_INCLUDE_UPDATES == true){
+            $updates = array(
+                'data' => $this->get_update_info()
+            );
+            $this->ss_client->sendUpdates($updates, true);
         }
 
-        $seo_dir = WP_PLUGIN_DIR.'/wordpress-seo';
-        if (is_file($seo_dir.'/wp-seo-main.php')) {
-            require_once('inc/wp-health-seo.php');
-
-            if(!$this->health)
+        if(defined('STACKSIGHT_INCLUDE_HEALTH') && STACKSIGHT_INCLUDE_HEALTH == true){
+            // health, include health security class if All in One Security plugin exists
+            $all_in_one_dir = WP_PLUGIN_DIR.'/all-in-one-wp-security-and-firewall';
+            if (is_file($all_in_one_dir.'/wp-security-core.php')) {
+                require_once($all_in_one_dir.'/wp-security-core.php');
+                require_once($all_in_one_dir.'/admin/wp-security-admin-init.php');
+                require_once('inc/wp-health-security.php');
+                // echo '<pre>'.print_r($GLOBALS['aio_wp_security'], true).'</pre>';
                 $this->health = new stdClass;
-
-            $this->health->seo = new WPHealthSeo();
-            if(!isset($health))
+                $this->health->security = new WPHealthSecurity();
                 $health = array();
+                $health['data'][] = $this->getSecurityData();
+            }
 
-            if($seo_data = $this->getSeoData())
-                $health['data'][] = $seo_data;
-        }
+            $seo_dir = WP_PLUGIN_DIR.'/wordpress-seo';
+            if (is_file($seo_dir.'/wp-seo-main.php')) {
+                require_once('inc/wp-health-seo.php');
 
-        $backups_dir = WP_PLUGIN_DIR.'/updraftplus';
-        if (is_file($backups_dir.'/updraftplus.php')) {
-            require_once('inc/wp-health-backups.php');
-            require_once($backups_dir.'/restorer.php');
-            require_once($backups_dir.'/options.php');
+                if(!$this->health)
+                    $this->health = new stdClass;
 
-            if(!$this->health)
-                $this->health = new stdClass;
+                $this->health->seo = new WPHealthSeo();
+                if(!isset($health))
+                    $health = array();
 
-            $this->health->backups = new WPHealthBackups();
-            if(!isset($health))
-                $health = array();
+                if($seo_data = $this->getSeoData())
+                    $health['data'][] = $seo_data;
+            }
 
-            if($backups_data = $this->getBackupsData())
-                $health['data'][] = $backups_data;
-        }
-        if(isset($health['data']) && !empty($health['data'])){
-            $this->ss_client->sendHealth($health, true);
+            $backups_dir = WP_PLUGIN_DIR . '/updraftplus';
+            if (is_file($backups_dir . '/updraftplus.php')) {
+                require_once('inc/wp-health-backups.php');
+                require_once($backups_dir . '/restorer.php');
+                require_once($backups_dir . '/options.php');
+
+                if (!$this->health)
+                    $this->health = new stdClass;
+
+                $this->health->backups = new WPHealthBackups();
+                if (!isset($health))
+                    $health = array();
+
+                if ($backups_data = $this->getBackupsData())
+                    $health['data'][] = $backups_data;
+            }
+
+            if(isset($health['data']) && !empty($health['data'])){
+                $this->ss_client->sendHealth($health, true);
+            }
         }
 
         if(defined('STACKSIGHT_INCLUDE_INVENTORY') && STACKSIGHT_INCLUDE_INVENTORY == true){
@@ -153,85 +164,87 @@ class WPStackSightPlugin {
     }
 
     public function insert_log_mean($args) {
-        $event = array();
-        if (is_user_logged_in()) {
-            $user = wp_get_current_user();
-            $event['user'] = array(
-                'name' => $user->user_login
-            );
+        if(defined('STACKSIGHT_INCLUDE_EVENTS') && STACKSIGHT_INCLUDE_EVENTS == true){
+            $event = array();
+            if (is_user_logged_in()) {
+                $user = wp_get_current_user();
+                $event['user'] = array(
+                    'name' => $user->user_login
+                );
+            }
+            switch ($args['object_type']) {
+                case 'Attachment':
+                    $mime = get_post_mime_type($args['object_id']);
+                    $file_mime_ex = explode('/', $mime);
+                    if (isset($file_mime_ex[0])) $event['subtype'] = $file_mime_ex[0];
+                    if ($args['action'] != 'deleted') $event['url'] = wp_get_attachment_url($args['object_id']);
+
+                    $event = array(
+                            'action' => $args['action'],
+                            'type' => 'file',
+                            'name' => $args['object_name'],
+                            'id' => $args['object_id'],
+                            'data' => array(
+                                'file_name' => $args['object_name'],
+                                'type' => $mime,
+                                'size' => filesize(get_attached_file($args['object_id'])),
+                                'url' => isset($event['url']) ? $event['url'] : '',
+                            )
+                        ) + $event;
+
+                    break;
+
+                case 'Post':
+                    if ($args['action'] != 'deleted') $event['url'] = get_permalink($args['object_id']);
+
+                    $event = array(
+                            'action' => $args['action'],
+                            'type' => 'content',
+                            'subtype' => $args['object_subtype'],
+                            'name' => $args['object_name'],
+                            'id' => $args['object_id']
+                        ) + $event;
+
+                    break;
+
+                case 'User':
+                    $event = array(
+                            'action' => $args['action'],
+                            'type' => 'user',
+                            'name' => $args['object_name'],
+                            'id' => $args['object_id']
+                        ) + $event;
+
+                    break;
+
+                case 'Comments':
+                    if (in_array($args['action'], array('spam', 'trash', 'delete'))) return;
+
+                    $comment = get_comment($args['object_id']);
+
+                    if ($args['action'] == 'pending') {
+                        $action = 'added';
+                        if (!isset($event['user'])) $event['user'] = array(
+                            'name' => isset($comment->comment_author) ? $comment->comment_author : 'guest'
+                        );
+                    } else $action = $args['action'];
+
+                    $event = array(
+                            'action' => $action,
+                            'type' => 'comment',
+                            'name' => $comment->comment_content,
+                            'id' => $args['object_id']
+                        ) + $event;
+
+                    break;
+
+                default:
+                    break;
+            }
+
+            $res = $this->ss_client->publishEvent($event);
+            if (!$res['success']) SSUtilities::error_log($res['message'], 'error');
         }
-        switch ($args['object_type']) {
-            case 'Attachment':
-                $mime = get_post_mime_type($args['object_id']);
-                $file_mime_ex = explode('/', $mime);
-                if (isset($file_mime_ex[0])) $event['subtype'] = $file_mime_ex[0];
-                if ($args['action'] != 'deleted') $event['url'] = wp_get_attachment_url($args['object_id']);
-
-                $event = array(
-                    'action' => $args['action'],
-                    'type' => 'file',
-                    'name' => $args['object_name'],
-                    'id' => $args['object_id'],
-                    'data' => array(
-                        'file_name' => $args['object_name'],
-                        'type' => $mime,
-                        'size' => filesize(get_attached_file($args['object_id'])),
-                        'url' => isset($event['url']) ? $event['url'] : '',
-                    )
-                ) + $event;
-
-                break;
-
-            case 'Post':
-                if ($args['action'] != 'deleted') $event['url'] = get_permalink($args['object_id']);
-
-                $event = array(
-                    'action' => $args['action'],
-                    'type' => 'content',
-                    'subtype' => $args['object_subtype'],
-                    'name' => $args['object_name'],
-                    'id' => $args['object_id']
-                ) + $event;
-
-                break;
-
-            case 'User':
-                $event = array(
-                    'action' => $args['action'],
-                    'type' => 'user',
-                    'name' => $args['object_name'],
-                    'id' => $args['object_id']
-                ) + $event;
-
-                break;
-
-            case 'Comments':
-                if (in_array($args['action'], array('spam', 'trash', 'delete'))) return;
-
-                $comment = get_comment($args['object_id']);
-
-                if ($args['action'] == 'pending') {
-                    $action = 'added';
-                    if (!isset($event['user'])) $event['user'] = array(
-                        'name' => isset($comment->comment_author) ? $comment->comment_author : 'guest'
-                    );
-                } else $action = $args['action'];
-
-                $event = array(
-                    'action' => $action,
-                    'type' => 'comment',
-                    'name' => $comment->comment_content,
-                    'id' => $args['object_id']
-                ) + $event;
-
-                break;
-
-            default:
-                break;
-        }
-
-        $res = $this->ss_client->publishEvent($event);
-        if (!$res['success']) SSUtilities::error_log($res['message'], 'error');
     }
 
     /**
@@ -243,7 +256,7 @@ class WPStackSightPlugin {
             'StackSight', 
             'manage_options', 
             'stacksight', 
-            array($this, 'create_admin_page'), 
+            array($this, 'create_admin_page'),
             '', 
             '80.2'
         );
@@ -290,24 +303,39 @@ class WPStackSightPlugin {
      * Options page callback
      */
     public function create_admin_page() {
+        $active_tab = isset( $_GET[ 'tab' ] ) ? $_GET[ 'tab' ] : 'general_settings';
         ?>
         <div class="ss-wrap wrap">
             <h2>App setting for StackSight</h2>
-            <form method="post" action="options.php">
-            <?php
-                // This prints out all hidden setting fields
-                settings_fields( 'stacksight_option_group' );
-                do_settings_sections( 'stacksight-set-admin' );
-//                 show code instructions block
-                $app_settings = get_option('stacksight_opt');
-                $this->showInstructions($app_settings);
+            <!-- Create a header in the default WordPress 'wrap' container -->
+            <div class="wrap">
+                <?php settings_errors(); ?>
+                <h2 class="nav-tab-wrapper">
+                    <a href="?page=stacksight&tab=general_settings" class="nav-tab <?php echo $active_tab == 'general_settings' ? 'nav-tab-active' : ''; ?>">General settings</a>
+<!--                    <a href="?page=stacksight&tab=slack_integration" class="nav-tab --><?php //echo $active_tab == 'slack_integration' ? 'nav-tab-active' : ''; ?><!--">Slack integration</a>-->
+                    <a href="?page=stacksight&tab=features_settings" class="nav-tab <?php echo $active_tab == 'features_settings' ? 'nav-tab-active' : ''; ?>">Features</a>
+                </h2>
+                <form method="post" action="options.php">
+                    <?php
+                        if( $active_tab == 'general_settings' ) {
+                            settings_fields( 'stacksight_option_group' );
+                            do_settings_sections( 'stacksight-set-admin' );
+                            //                 show code instructions block
+                            $app_settings = get_option('stacksight_opt');
+                            $this->showInstructions($app_settings);
+                        } else {
+                            settings_fields( 'stacksight_option_features' );
+                            do_settings_sections( 'stacksight-set-features' );
+                            //                 show code instructions block
+                            $app_settings = get_option('stacksight_opt_features');
+                            $this->showInstructions($app_settings);
+                        }
 
-                // trigger_error('test', E_USER_ERROR);
-                // echo '<pre>'.print_r($GLOBALS['aio_wp_security'], true).'</pre>';
-//                 echo '<pre>'.print_r($app_settings, true).'</pre>';
-            ?>
-            <?php submit_button(); ?>
-            </form>
+                        submit_button();
+                    ?>
+                </form>
+
+            </div><!-- /.wrap -->
         </div>
         <?php
     }
@@ -523,6 +551,34 @@ class WPStackSightPlugin {
             'stacksight_opt', // Option name
             array( $this, 'sanitize' ) // Sanitize
         );
+
+        register_setting(
+            'stacksight_option_slack', // Option group
+            'stacksight_opt_slack', // Option name
+            array( $this, 'slackSanitize' ) // Sanitize
+        );
+
+        register_setting(
+            'stacksight_option_features', // Option group
+            'stacksight_opt_features', // Option name
+            array( $this, 'featuresSanitize' ) // Sanitize
+        );
+
+
+        add_settings_section(
+            'setting_section_stacksight', // ID
+            null, // Title
+            null, // Callback
+            'stacksight-set-features' // Page
+        );
+
+        add_settings_section(
+            'setting_section_stacksight', // ID
+            null, // Title
+            null, // Callback
+            'stacksight-set-slack' // Page
+        );
+
         add_settings_section(
             'setting_section_stacksight', // ID
             null, // Title
@@ -530,19 +586,85 @@ class WPStackSightPlugin {
             'stacksight-set-admin' // Page
         );
 
-        if(defined('STACKSIGHT_APP_ID')){
-            add_settings_field(
-                'appId',
-                'Application ID',
-                array( $this, 'appId_callback' ),
-                'stacksight-set-admin',
-                'setting_section_stacksight'
-            );
-        }
+        $title = (defined('stacksight_logs_title')) ? stacksight_logs_title : 'Include Logs';
+        add_settings_field(
+            'include_logs',
+            $title,
+            array( $this, 'include_logs_callback' ),
+            'stacksight-set-features',
+            'setting_section_stacksight'
+        );
+
+        $title = (defined('stacksight_health_title')) ? stacksight_health_title : 'Include Health';
+        add_settings_field(
+            'include_health',
+            $title,
+            array( $this, 'include_health_callback' ),
+            'stacksight-set-features',
+            'setting_section_stacksight'
+        );
+
+        $title = (defined('stacksight_inventory_title')) ? stacksight_inventory_title : 'Include Inventory';
+        add_settings_field(
+            'include_inventory',
+            $title,
+            array( $this, 'include_inventory_callback' ),
+            'stacksight-set-features',
+            'setting_section_stacksight'
+        );
+
+        $title = (defined('stacksight_events_title')) ? stacksight_events_title : 'Include Events';
+        add_settings_field(
+            'include_events',
+            $title,
+            array( $this, 'include_events_callback' ),
+            'stacksight-set-features',
+            'setting_section_stacksight'
+        );
+
+        $title = (defined('stacksight_updates_title')) ? stacksight_updates_title : 'Include Updates';
+        add_settings_field(
+            'include_updates',
+            $title,
+            array( $this, 'include_updates_callback' ),
+            'stacksight-set-features',
+            'setting_section_stacksight'
+        );
 
         add_settings_field(
+            'slack_url',
+            'Webhook incoming URL',
+            array( $this, 'slack_url_callback' ),
+            'stacksight-set-slack',
+            'setting_section_stacksight'
+        );
+
+        add_settings_field(
+            'enable_slack_notify_logs',
+            'Enable slack notifications',
+            array( $this, 'enable_slack_notify_logs_callback' ),
+            'stacksight-set-slack',
+            'setting_section_stacksight'
+        );
+
+        add_settings_field(
+            'enable_slack_options',
+            'Slack notify options',
+            array( $this, 'enable_slack_options_callback' ),
+            'stacksight-set-slack',
+            'setting_section_stacksight'
+        );
+
+        add_settings_field(
+            '_id',
+            'App ID',
+            array( $this, 'app_id_callback' ),
+            'stacksight-set-admin',
+            'setting_section_stacksight'
+        );
+        add_settings_field(
             'token',
-            'Access Token',
+            'Access Token *',
             array( $this, 'token_callback' ),
             'stacksight-set-admin',
             'setting_section_stacksight'
@@ -550,11 +672,21 @@ class WPStackSightPlugin {
 
         add_settings_field(
             'group',
-            'Application group',
+            'App Group',
             array( $this, 'group_callback' ),
             'stacksight-set-admin',
             'setting_section_stacksight'
         );
+
+        /*
+        add_settings_field(
+            'enable_options',
+            'Enable options',
+            array( $this, 'enable_options_callback' ),
+            'stacksight-set-admin',
+            'setting_section_stacksight'
+        );
+        */
 
         add_settings_field(
             'cron_updates_interval', 
@@ -565,6 +697,8 @@ class WPStackSightPlugin {
         );
 
         $this->options = get_option('stacksight_opt');
+//        $this->options_slack = get_option('stacksight_opt_slack');
+        $this->options_features = get_option('stacksight_opt_features');
     }
 
     /**
@@ -575,8 +709,16 @@ class WPStackSightPlugin {
     public function sanitize($input) {
         $new_input = array();
 
+//        if(!$input['_id']) add_settings_error('_id', '_id', '"App ID" can not be empty');
+        if(!$input['token']) add_settings_error('token', 'token', '"App Acces Token" can not be empty');
+//        if(!$input['group']) add_settings_error('group', 'group', '"App group" can not be empty');
+
         $any_errors = $this->any_form_errors();
 
+        $new_input['_id'] = $input['_id'];
+        $new_input['token'] = $input['token'];
+        $new_input['group'] = $input['group'];
+        $new_input['enable_options'] = array_keys($input['enable_options']);
         $new_input['cron_updates_interval'] = $input['cron_updates_interval'];
         // schedule the updates action
         wp_clear_scheduled_hook('stacksight_main_action');
@@ -585,35 +727,168 @@ class WPStackSightPlugin {
         return $new_input;
     }
 
-    public function appId_callback() {
-        if(defined('STACKSIGHT_TOKEN')){
-            printf(
-                '<span>'.STACKSIGHT_APP_ID.'</span>'
-            );
+    public function featuresSanitize($input) {
+        $new_input = array();
+        $any_errors = $this->any_form_errors();
+        $new_input['include_logs'] = (isset($input['include_logs']) && $input['include_logs'] == 'on') ? true : false;
+        $new_input['include_health'] = (isset($input['include_health']) && $input['include_health'] == 'on') ? true : false;
+        $new_input['include_inventory'] = (isset($input['include_inventory']) && $input['include_inventory'] == 'on') ? true : false;
+        $new_input['include_events'] = (isset($input['include_events']) && $input['include_events'] == 'on') ? true : false;
+        $new_input['include_updates'] = (isset($input['include_updates']) && $input['include_updates'] == 'on') ? true : false;
+        // schedule the updates action
+        wp_clear_scheduled_hook('stacksight_main_action');
+        return $new_input;
+    }
+
+    public function slackSanitize($input) {
+        $new_input = array();
+        if(!$input['slack_url']) add_settings_error('slack_url', 'slack_url', '"Webhook incoming URL" can not be empty');
+
+        $any_errors = $this->any_form_errors();
+
+        $new_input['slack_url'] = $input['slack_url'];
+        $new_input['enable_slack_notify_logs'] = (isset($input['enable_slack_notify_logs']) && $input['enable_slack_notify_logs'] == 'on') ? true : false;
+        $new_input['enable_slack_options'] = (is_array($input['enable_slack_options'])) ? array_keys($input['enable_slack_options']) : array();
+        // schedule the updates action
+        wp_clear_scheduled_hook('stacksight_main_action');
+        return $new_input;
+    }
+
+    /**
+     * Get the settings option array and print one of its values
+     */
+
+    public function include_logs_callback(){
+        $checked = '';
+        if(isset($this->options_features['include_logs']) && $this->options_features['include_logs'] == true){
+            $checked = 'checked';
         }
+        $description = '';
+        if(defined('stacksight_logs_text')){
+            $description = stacksight_logs_text;
+        }
+        printf('<div class="health_features_option"><div class="checkbox"><input type="checkbox" name="stacksight_opt_features[include_logs]" id="enable_features_logs" '.$checked.' /></div>'.$description.'</div>');
+    }
+
+    public function include_health_callback(){
+        $checked = '';
+        if(isset($this->options_features['include_health']) && $this->options_features['include_health'] == true){
+            $checked = 'checked';
+        }
+        $description = '';
+        if(defined('stacksight_health_text')){
+            $description = stacksight_health_text;
+        }
+        printf('<div class="health_features_option"><div class="checkbox"><input type="checkbox" name="stacksight_opt_features[include_health]" id="enable_features_health" '.$checked.' /></div>'.$description.'</div>');
+    }
+
+    public function include_inventory_callback(){
+        $checked = '';
+        if(isset($this->options_features['include_inventory']) && $this->options_features['include_inventory'] == true){
+            $checked = 'checked';
+        }
+        $description = '';
+        if(defined('stacksight_inventory_text')){
+            $description = stacksight_inventory_text;
+        }
+        printf('<div class="health_features_option"><div class="checkbox"><input type="checkbox" name="stacksight_opt_features[include_inventory]" id="enable_features_inventory" '.$checked.' /></div>'.$description.'</div>');
+    }
+
+    public function include_updates_callback(){
+        $checked = '';
+        if(isset($this->options_features['include_updates']) && $this->options_features['include_updates'] == true){
+            $checked = 'checked';
+        }
+        $description = '';
+        if(defined('stacksight_updates_text')){
+            $description = stacksight_updates_text;
+        }
+        printf('<div class="health_features_option"><div class="checkbox"><input type="checkbox" name="stacksight_opt_features[include_updates]" id="enable_features_events" '.$checked.' /></div>'.$description.'</div>');
+    }
+
+    public function include_events_callback(){
+        $checked = '';
+        if(isset($this->options_features['include_events']) && $this->options_features['include_events'] == true){
+            $checked = 'checked';
+        }
+        $description = '';
+        if(defined('stacksight_events_text')){
+            $description = stacksight_events_text;
+        }
+        printf('<div class="health_features_option"><div class="checkbox"><input type="checkbox" name="stacksight_opt_features[include_events]" id="enable_features_events" '.$checked.' /></div>'.$description.'</div>');
+    }
+
+    public function slack_url_callback() {
+        printf(
+            '<input type="text" id="slack_url" name="stacksight_opt_slack[slack_url]" value="%s" size="50" />',
+            isset( $this->options_slack['slack_url'] ) ? esc_attr( $this->options_slack['slack_url']) : ''
+        );
+    }
+
+    public function app_id_callback() {
+        printf(
+            '<input type="text" id="_id" name="stacksight_opt[_id]" value="%s" size="50" />',
+            isset( $this->options['_id'] ) ? esc_attr( $this->options['_id']) : ''
+        );
     }
 
     public function token_callback() {
-        if(!defined('STACKSIGHT_TOKEN')){
-            printf(
-                '<span class="pre-code-red"> Not set </span>'
-            );
-        } else {
-            printf(
-                '<span>'.STACKSIGHT_TOKEN.'</span>'
-            );
+        printf(
+            '<input type="text" id="token" name="stacksight_opt[token]" value="%s" size="50" />',
+            isset( $this->options['token'] ) ? esc_attr( $this->options['token']) : ''
+        );
+    }
+
+    public function group_callback() {
+        printf(
+            '<input type="text" id="group" name="stacksight_opt[group]" value="%s" size="50" />',
+            isset( $this->options['group'] ) ? esc_attr( $this->options['group']) : ''
+        );
+    }
+
+    public function enable_slack_notify_logs_callback(){
+        $checked = '';
+        if(isset($this->options_slack['enable_slack_notify_logs']) && $this->options_slack['enable_slack_notify_logs'] == true){
+            $checked = 'checked';
+        }
+        printf('<div><input type="checkbox" name="stacksight_opt_slack[enable_slack_notify_logs]" id="enable_slack_notify_logs" '.$checked.' /></div>');
+    }
+
+    public function enable_slack_options_callback(){
+        $options = array(
+            'error' => 'Errors',
+            'warn' => 'Warning',
+            'info' => 'Info'
+        );
+
+        $opt_array = '';
+        $checked_options = isset($this->options_slack['enable_slack_options']) ? $this->options_slack['enable_slack_options'] : array();
+        foreach($options as $key => $option){
+            $checked = '';
+            if(in_array($key, $checked_options)){
+                $checked = 'checked';
+            }
+            printf('<div><input type="checkbox" name="stacksight_opt_slack[enable_slack_options]['.$key.']" id="enable_slack_options" '.$checked.' /><span>%s</span></div>', $option);
         }
     }
 
-    public function group_callback(){
-        if(!defined('STACKSIGHT_GROUP')){
-            printf(
-                '<span class=""> Not set </span>'
-            );
-        } else {
-            printf(
-                '<span>'.STACKSIGHT_GROUP.'</span>'
-            );
+    public function enable_options_callback(){
+        $options = array(
+            'logs' => 'Logs',
+            'health_seo' => 'Health SEO',
+            'health_backup' => 'Health backup',
+            'health_security' => 'Health security',
+            'inventory' => 'Inventory',
+        );
+
+        $opt_array = '';
+        $checked_options = isset($this->options['enable_options']) ? $this->options['enable_options'] : array();
+        foreach($options as $key => $option){
+            $checked = '';
+            if(in_array($key, $checked_options)){
+                $checked = 'checked';
+            }
+            printf('<div><input type="checkbox" name="stacksight_opt[enable_options]['.$key.']" id="enable_options" '.$checked.' /><span>%s</span></div>', $option);
         }
     }
 
@@ -680,12 +955,12 @@ class WPStackSightPlugin {
         $show_code = false;
 
         if (!defined('STACKSIGHT_TOKEN')) {
-            $list[] = __('Tokens do not match', 'stacksight').'<br>';
+            $list[] = __('Token doesn\'t exist', 'stacksight').'<br>';
             $show_code = true;
         }
     
         if (!defined('STACKSIGHT_BOOTSTRAPED') || $list) {
-            $list[] = __('wp-config.php is not configured as specified above', 'stacksight').'<br>';
+            $list[] = __('wp-config.php is not configured as specified below', 'stacksight').'<br>';
             $show_code = true;
         }
 
@@ -719,19 +994,21 @@ public function showInstructions($app) {
     </div>
     <?php if (!defined('STACKSIGHT_TOKEN') && $diagnostic['show_code']): ?>
     <div class="ss-config-block">
-        <p><?php echo __("Insert that code (start - end) at the top of your wp-config.php after a line <strong>".htmlspecialchars('<?php')." </strong>") ?></p>
+        <p><?php echo __("Insert that code (start - end) at the bottom of your wp-config.php but before a line <strong>".htmlspecialchars('require_once(ABSPATH . \'wp-settings.php\');')." </strong>") ?></p>
         <div class="class-code">
             <div class="code-comments">// StackSight start config</div>
             <div class="">
                 <div>$ss_inc<span class=""> = </span><span class="">dirname(__FILE__)</span><span class=""> . </span><span class="">'/<?php echo $this->getRelativeRootPath(); ?>stacksight-php-sdk/bootstrap-wp.php'</span>;</div>
                 <div><span class="">if</span>(<span class="">is_file</span>($ss_inc)) {</div>
                 <div class="tab">
-                    <div><span class="">define</span>(<span class="">'STACKSIGHT_TOKEN'</span>, '<span class="code-yellow"><?php echo $app_token?></span>');</div>
                     <div><span class="">require_once</span>($ss_inc);</div>
                 </div>
                 }
             </div>
             <div class="code-comments">// StackSight end config</div>
+        </div>
+        <div class="screen-of-config">
+            <img src="<?php echo plugins_url('assets/img/config-screen.png', __FILE__ )?>" alt="Screen of config"/>
         </div>
     </div>
 <?php endif;
