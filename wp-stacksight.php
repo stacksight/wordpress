@@ -3,7 +3,7 @@
  * Plugin Name: Stacksight
  * Plugin URI: http://mean.io
  * Description: Stacksight wordpress support (featuring events, error logs and updates)
- * Version: 1.8.0
+ * Version: 1.8.2
  * Author: Stacksight LTD
  * Author URI: http://stacksight.io
  * License: GPL
@@ -944,10 +944,10 @@ class WPStackSightPlugin {
     }
 
     public function getRelativeRootPath() {
-        $plg_dir = plugin_dir_path( __FILE__ );
-        if (strpos($plg_dir, ABSPATH) === FALSE) return;
-
-        return substr($plg_dir, strlen(ABSPATH));
+        $plg_dir = str_replace('\\', '/', plugin_dir_path( __FILE__ ));
+        $abs_path = str_replace('\\', '/', ABSPATH);
+        if (strpos($plg_dir, $abs_path) === FALSE) return;
+        return substr($plg_dir, strlen($abs_path));
     }
 
     public function getDiagnostic($app) {
