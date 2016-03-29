@@ -24,12 +24,7 @@ class WPStackSightPlugin {
     private $options_slack;
     private $options_features;
     private $health;
-    private $dep_plugins = array(
-        'aryo-activity-log/aryo-activity-log.php' => array(
-            'name' => 'Activity Log',
-            'link' => 'https://wordpress.org/plugins/aryo-activity-log'
-        )
-    );
+    private $dep_plugins = array();
 
     public function __construct() {
         register_activation_hook( __FILE__, array(__CLASS__, 'install'));
@@ -50,7 +45,12 @@ class WPStackSightPlugin {
             $group = (defined('STACKSIGHT_GROUP')) ?  STACKSIGHT_GROUP : false;
             $this->ss_client = new SSWordpressClient(STACKSIGHT_TOKEN, SSClientBase::PLATFORM_WORDPRESS, $app_id, $group);
             add_filter('cron_schedules', array($this, 'cron_custom_interval'));
-            add_action('aal_insert_log', array(&$this, 'insert_log_mean'), 30);
+            if (function_exists('register_nav_menus')){
+
+            }
+            if((defined('STACKSIGHT_DEPENDENCY_AAL') && STACKSIGHT_DEPENDENCY_AAL === true) && function_exists('aal_insert_log')) {
+                add_action('aal_insert_log', array(&$this, 'insert_log_mean'), 30);
+            }
             add_action('stacksight_main_action', array($this, 'cron_do_main_job'));
         }
     }
@@ -815,7 +815,13 @@ class WPStackSightPlugin {
         if(defined('stacksight_events_text')){
             $description = stacksight_events_text;
         }
-        printf('<div class="health_features_option"><div class="checkbox"><input type="checkbox" name="stacksight_opt_features[include_events]" id="enable_features_events" '.$checked.' /></div>'.$description.'</div>');
+        if((defined('STACKSIGHT_DEPENDENCY_AAL') && STACKSIGHT_DEPENDENCY_AAL === true) && function_exists('aal_insert_log')){
+            printf('<div class="health_features_option"><div class="checkbox"><input type="checkbox" name="stacksight_opt_features[include_events]" id="enable_features_events" '.$checked.' disabled/></div>'.$description.'</div>');
+
+        } else{
+            printf('<div class="health_features_option"><div class="checkbox"><input type="checkbox" name="stacksight_opt_features[include_events]" id="enable_features_events" disabled/></div>'.$description.'</div>');
+
+        }
     }
 
     public function slack_url_callback() {

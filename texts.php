@@ -22,9 +22,14 @@ define('stacksight_inventory_text', $inventory_text);
 
 
 define('stacksight_events_title', 'Include Events');
-$events_text = <<<HTML
+$events_text = (defined('STACKSIGHT_DEPENDENCY_AAL') && STACKSIGHT_DEPENDENCY_AAL === true) ? <<<HTML
     <div>Watch users and application events at real time</div>
+HTML
+:
+<<<HTML
+    <div class="code-red">If you want events enable, please install <a href="https://ru.wordpress.org/plugins/aryo-activity-log/" target="_blank">Activity Log plugin</a>.</div>
 HTML;
+;
 define('stacksight_events_text', $events_text);
 
 
