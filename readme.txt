@@ -43,8 +43,7 @@ stacksight contributions can be done through submiting PRS to the [Github repo](
 
 == Installation ==
 
-1. Prerequisite: Get the [aryo activity log](https://wordpress.org/plugins/aryo-activity-log) plugin and activate it.
-1. Upload the stacksight plugin to your plugins folder, or install using WordPress' built-in Add New Plugin installer 
+1. Upload the stacksight plugin to your plugins folder, or install using WordPress' built-in Add New Plugin installer
 1. Activate the plugin
 1. Go to the 
 
