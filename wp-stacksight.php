@@ -965,7 +965,7 @@ class WPStackSightPlugin {
             $show_code = true;
         }
     
-        if (!defined('STACKSIGHT_BOOTSTRAPED') || $list) {
+        if ((!defined('STACKSIGHT_PHP_SDK_INCLUDE') || (defined('STACKSIGHT_PHP_SDK_INCLUDE') && STACKSIGHT_PHP_SDK_INCLUDE !== true))) {
             $list[] = __('wp-config.php is not configured as specified below', 'stacksight').'<br>';
             $show_code = true;
         }
@@ -998,7 +998,7 @@ public function showInstructions($app) {
             <?php endif ?>
         </ul>
     </div>
-    <?php if (!defined('STACKSIGHT_TOKEN') && $diagnostic['show_code']): ?>
+    <?php if ((!defined('STACKSIGHT_PHP_SDK_INCLUDE') || (defined('STACKSIGHT_PHP_SDK_INCLUDE') && STACKSIGHT_PHP_SDK_INCLUDE !== true)) && $diagnostic['show_code']): ?>
     <div class="ss-config-block">
         <p><?php echo __("Insert that code (start - end) at the bottom of your wp-config.php but before a line <strong>".htmlspecialchars('require_once(ABSPATH . \'wp-settings.php\');')." </strong>") ?></p>
         <div class="class-code">
