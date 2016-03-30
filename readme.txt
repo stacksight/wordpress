@@ -3,7 +3,7 @@ Contributors: liorkesos, bora-89, igor-lemon
 Tags: administration, activity, event, monitor, multisite, multi-users, log, logger, audit log, stats, security, tracking, woocommerce, notifications, email notifications
 Requires at least: 3.5
 Tested up to: 4.3
-Stable tag: 1.8.0
+Stable tag: 1.8.3
 License: GPLv2 or later
 
 
@@ -11,8 +11,6 @@ License: GPLv2 or later
 Get a realtime stream of events and logs from your wordpress applications (and other opensource applications as well!)
 
 == Description ==
-
-Stacksight uses the awesome <a href="https://wordpress.org/plugins/aryo-activity-log/">aryo activity log</a> plugin (by <a href="http://pojo.me">pojo.me</a> to send a realtime event stream of your wordpress activity.
 
 <strong>Stacksight logs the next events to the stacksight.io dashboard</strong><br />
 
@@ -45,8 +43,7 @@ stacksight contributions can be done through submiting PRS to the [Github repo](
 
 == Installation ==
 
-1. Prerequisite: Get the [aryo activity log](https://wordpress.org/plugins/aryo-activity-log) plugin and activate it.
-1. Upload the stacksight plugin to your plugins folder, or install using WordPress' built-in Add New Plugin installer 
+1. Upload the stacksight plugin to your plugins folder, or install using WordPress' built-in Add New Plugin installer
 1. Activate the plugin
 1. Go to the 
 

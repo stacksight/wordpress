@@ -3,7 +3,7 @@
  * Plugin Name: Stacksight
  * Plugin URI: http://mean.io
  * Description: Stacksight wordpress support (featuring events, error logs and updates)
- * Version: 1.8.0
+ * Version: 1.8.3
  * Author: Stacksight LTD
  * Author URI: http://stacksight.io
  * License: GPL
@@ -24,12 +24,7 @@ class WPStackSightPlugin {
     private $options_slack;
     private $options_features;
     private $health;
-    private $dep_plugins = array(
-        'aryo-activity-log/aryo-activity-log.php' => array(
-            'name' => 'Activity Log',
-            'link' => 'https://wordpress.org/plugins/aryo-activity-log'
-        )
-    );
+    private $dep_plugins = array();
 
     public function __construct() {
         register_activation_hook( __FILE__, array(__CLASS__, 'install'));
@@ -50,7 +45,12 @@ class WPStackSightPlugin {
             $group = (defined('STACKSIGHT_GROUP')) ?  STACKSIGHT_GROUP : false;
             $this->ss_client = new SSWordpressClient(STACKSIGHT_TOKEN, SSClientBase::PLATFORM_WORDPRESS, $app_id, $group);
             add_filter('cron_schedules', array($this, 'cron_custom_interval'));
-            add_action('aal_insert_log', array(&$this, 'insert_log_mean'), 30);
+            if (function_exists('register_nav_menus')){
+
+            }
+            if((defined('STACKSIGHT_DEPENDENCY_AAL') && STACKSIGHT_DEPENDENCY_AAL === true) && function_exists('aal_insert_log')) {
+                add_action('aal_insert_log', array(&$this, 'insert_log_mean'), 30);
+            }
             add_action('stacksight_main_action', array($this, 'cron_do_main_job'));
         }
     }
@@ -815,7 +815,13 @@ class WPStackSightPlugin {
         if(defined('stacksight_events_text')){
             $description = stacksight_events_text;
         }
-        printf('<div class="health_features_option"><div class="checkbox"><input type="checkbox" name="stacksight_opt_features[include_events]" id="enable_features_events" '.$checked.' /></div>'.$description.'</div>');
+        if((defined('STACKSIGHT_DEPENDENCY_AAL') && STACKSIGHT_DEPENDENCY_AAL === true) && function_exists('aal_insert_log')){
+            printf('<div class="health_features_option"><div class="checkbox"><input type="checkbox" name="stacksight_opt_features[include_events]" id="enable_features_events" '.$checked.' disabled/></div>'.$description.'</div>');
+
+        } else{
+            printf('<div class="health_features_option"><div class="checkbox"><input type="checkbox" name="stacksight_opt_features[include_events]" id="enable_features_events" disabled/></div>'.$description.'</div>');
+
+        }
     }
 
     public function slack_url_callback() {
@@ -944,10 +950,10 @@ class WPStackSightPlugin {
     }
 
     public function getRelativeRootPath() {
-        $plg_dir = plugin_dir_path( __FILE__ );
-        if (strpos($plg_dir, ABSPATH) === FALSE) return;
-
-        return substr($plg_dir, strlen(ABSPATH));
+        $plg_dir = str_replace('\\', '/', plugin_dir_path( __FILE__ ));
+        $abs_path = str_replace('\\', '/', ABSPATH);
+        if (strpos($plg_dir, $abs_path) === FALSE) return;
+        return substr($plg_dir, strlen($abs_path));
     }
 
     public function getDiagnostic($app) {
@@ -959,7 +965,7 @@ class WPStackSightPlugin {
             $show_code = true;
         }
     
-        if (!defined('STACKSIGHT_BOOTSTRAPED') || $list) {
+        if ((!defined('STACKSIGHT_PHP_SDK_INCLUDE') || (defined('STACKSIGHT_PHP_SDK_INCLUDE') && STACKSIGHT_PHP_SDK_INCLUDE !== true))) {
             $list[] = __('wp-config.php is not configured as specified below', 'stacksight').'<br>';
             $show_code = true;
         }
@@ -992,7 +998,7 @@ public function showInstructions($app) {
             <?php endif ?>
         </ul>
     </div>
-    <?php if (!defined('STACKSIGHT_TOKEN') && $diagnostic['show_code']): ?>
+    <?php if ((!defined('STACKSIGHT_PHP_SDK_INCLUDE') || (defined('STACKSIGHT_PHP_SDK_INCLUDE') && STACKSIGHT_PHP_SDK_INCLUDE !== true)) && $diagnostic['show_code']): ?>
     <div class="ss-config-block">
         <p><?php echo __("Insert that code (start - end) at the bottom of your wp-config.php but before a line <strong>".htmlspecialchars('require_once(ABSPATH . \'wp-settings.php\');')." </strong>") ?></p>
         <div class="class-code">
