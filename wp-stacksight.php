@@ -3,7 +3,7 @@
  * Plugin Name: Stacksight
  * Plugin URI: http://mean.io
  * Description: Stacksight wordpress support (featuring events, error logs and updates)
- * Version: 1.8.3
+ * Version: 1.8.4
  * Author: Stacksight LTD
  * Author URI: http://stacksight.io
  * License: GPL
@@ -816,8 +816,7 @@ class WPStackSightPlugin {
             $description = stacksight_events_text;
         }
         if((defined('STACKSIGHT_DEPENDENCY_AAL') && STACKSIGHT_DEPENDENCY_AAL === true) && function_exists('aal_insert_log')){
-            printf('<div class="health_features_option"><div class="checkbox"><input type="checkbox" name="stacksight_opt_features[include_events]" id="enable_features_events" '.$checked.' disabled/></div>'.$description.'</div>');
-
+            printf('<div class="health_features_option"><div class="checkbox"><input type="checkbox" name="stacksight_opt_features[include_events]" id="enable_features_events" '.$checked.' /></div>'.$description.'</div>');
         } else{
             printf('<div class="health_features_option"><div class="checkbox"><input type="checkbox" name="stacksight_opt_features[include_events]" id="enable_features_events" disabled/></div>'.$description.'</div>');
 
