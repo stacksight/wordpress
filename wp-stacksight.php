@@ -322,13 +322,13 @@ class WPStackSightPlugin {
                             do_settings_sections( 'stacksight-set-admin' );
                             //                 show code instructions block
                             $app_settings = get_option('stacksight_opt');
-                            $this->showInstructions($app_settings);
+//                            $this->showInstructions($app_settings);
                         } else {
                             settings_fields( 'stacksight_option_features' );
                             do_settings_sections( 'stacksight-set-features' );
                             //                 show code instructions block
                             $app_settings = get_option('stacksight_opt_features');
-                            $this->showInstructions($app_settings);
+//                            $this->showInstructions($app_settings);
                         }
 
                         submit_button();
@@ -831,24 +831,62 @@ class WPStackSightPlugin {
     }
 
     public function app_id_callback() {
-        printf(
-            '<input type="text" id="_id" name="stacksight_opt[_id]" value="%s" size="50" />',
-            isset( $this->options['_id'] ) ? esc_attr( $this->options['_id']) : ''
-        );
+        if(defined('STACKSIGHT_SETTINGS_IN_DB') && STACKSIGHT_SETTINGS_IN_DB === true){
+            printf(
+                '<input type="text" id="_id" name="stacksight_opt[_id]" value="%s" size="50" />',
+                isset( $this->options['_id'] ) ? esc_attr( $this->options['_id']) : ''
+            );
+        } else{
+            if(!defined('STACKSIGHT_APP_ID')){
+                printf(
+                    '<span class="pre-code-green"> Is calculated </span>'
+                );
+            } else {
+                printf(
+                    '<span>'.STACKSIGHT_APP_ID.'</span>'
+                );
+            }
+        }
+
+
     }
 
     public function token_callback() {
-        printf(
-            '<input type="text" id="token" name="stacksight_opt[token]" value="%s" size="50" />',
-            isset( $this->options['token'] ) ? esc_attr( $this->options['token']) : ''
-        );
+        if(defined('STACKSIGHT_SETTINGS_IN_DB') && STACKSIGHT_SETTINGS_IN_DB === true){
+            printf(
+                '<input type="text" id="token" name="stacksight_opt[token]" value="%s" size="50" />',
+                isset( $this->options['token'] ) ? esc_attr( $this->options['token']) : ''
+            );
+        } else{
+            if(!defined('STACKSIGHT_TOKEN')){
+                printf(
+                    '<span class="pre-code-red"> Not set </span>'
+                );
+            } else {
+                printf(
+                    '<span>'.STACKSIGHT_TOKEN.'</span>'
+                );
+            }
+        }
     }
 
     public function group_callback() {
-        printf(
-            '<input type="text" id="group" name="stacksight_opt[group]" value="%s" size="50" />',
-            isset( $this->options['group'] ) ? esc_attr( $this->options['group']) : ''
-        );
+        if(defined('STACKSIGHT_SETTINGS_IN_DB') && STACKSIGHT_SETTINGS_IN_DB === true){
+            printf(
+                '<input type="text" id="group" name="stacksight_opt[group]" value="%s" size="50" />',
+                isset( $this->options['group'] ) ? esc_attr( $this->options['group']) : ''
+            );
+        } else{
+            if(!defined('STACKSIGHT_GROUP')){
+                printf(
+                    '<span class="pre-code-red"> Not set </span>'
+                );
+            } else {
+                printf(
+                    '<span>'.STACKSIGHT_GROUP.'</span>'
+                );
+            }
+        }
     }
 
     public function enable_slack_notify_logs_callback(){
