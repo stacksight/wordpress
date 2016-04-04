@@ -715,9 +715,11 @@ class WPStackSightPlugin {
 
         $any_errors = $this->any_form_errors();
 
-        $new_input['_id'] = $input['_id'];
-        $new_input['token'] = $input['token'];
-        $new_input['group'] = $input['group'];
+        if(defined('STACKSIGHT_SETTINGS_IN_DB') && STACKSIGHT_SETTINGS_IN_DB === true){
+            $new_input['_id'] = $input['_id'];
+            $new_input['token'] = $input['token'];
+            $new_input['group'] = $input['group'];
+        }
         $new_input['enable_options'] = array_keys($input['enable_options']);
         $new_input['cron_updates_interval'] = $input['cron_updates_interval'];
         // schedule the updates action
