@@ -762,7 +762,7 @@ class WPStackSightPlugin {
 
     public function include_logs_callback(){
         $checked = '';
-        if(isset($this->options_features['include_logs']) && $this->options_features['include_logs'] == true){
+        if(defined('STACKSIGHT_INCLUDE_LOGS') && STACKSIGHT_INCLUDE_LOGS === true) {
             $checked = 'checked';
         }
         $description = '';
@@ -774,7 +774,7 @@ class WPStackSightPlugin {
 
     public function include_health_callback(){
         $checked = '';
-        if((isset($this->options_features['include_health']) && $this->options_features['include_health'] == true) || !isset($this->options_features['include_health'])){
+        if(defined('STACKSIGHT_INCLUDE_HEALTH') && STACKSIGHT_INCLUDE_HEALTH === true){
             $checked = 'checked';
         }
         $description = '';
@@ -786,7 +786,7 @@ class WPStackSightPlugin {
 
     public function include_inventory_callback(){
         $checked = '';
-        if((isset($this->options_features['include_inventory']) && $this->options_features['include_inventory'] == true) || !isset($this->options_features['include_inventory'])) {
+        if(defined('STACKSIGHT_INCLUDE_INVENTORY') && STACKSIGHT_INCLUDE_INVENTORY === true) {
             $checked = 'checked';
         }
         $description = '';
@@ -798,7 +798,7 @@ class WPStackSightPlugin {
 
     public function include_updates_callback(){
         $checked = '';
-        if((isset($this->options_features['include_updates']) && $this->options_features['include_updates'] == true) || !isset($this->options_features['include_updates'])){
+        if(defined('STACKSIGHT_INCLUDE_UPDATES') && STACKSIGHT_INCLUDE_UPDATES === true){
             $checked = 'checked';
         }
         $description = '';
@@ -810,7 +810,7 @@ class WPStackSightPlugin {
 
     public function include_events_callback(){
         $checked = '';
-        if((isset($this->options_features['include_events']) && $this->options_features['include_events'] == true) || !isset($this->options_features['include_events'])){
+        if(defined('STACKSIGHT_INCLUDE_EVENTS') && STACKSIGHT_INCLUDE_EVENTS === true){
             $checked = 'checked';
         }
         $description = '';
