@@ -774,7 +774,7 @@ class WPStackSightPlugin {
 
     public function include_health_callback(){
         $checked = '';
-        if(isset($this->options_features['include_health']) && $this->options_features['include_health'] == true){
+        if((isset($this->options_features['include_health']) && $this->options_features['include_health'] == true) || !isset($this->options_features['include_health'])){
             $checked = 'checked';
         }
         $description = '';
@@ -786,7 +786,7 @@ class WPStackSightPlugin {
 
     public function include_inventory_callback(){
         $checked = '';
-        if(isset($this->options_features['include_inventory']) && $this->options_features['include_inventory'] == true){
+        if((isset($this->options_features['include_inventory']) && $this->options_features['include_inventory'] == true) || !isset($this->options_features['include_inventory'])) {
             $checked = 'checked';
         }
         $description = '';
@@ -798,7 +798,7 @@ class WPStackSightPlugin {
 
     public function include_updates_callback(){
         $checked = '';
-        if(isset($this->options_features['include_updates']) && $this->options_features['include_updates'] == true){
+        if((isset($this->options_features['include_updates']) && $this->options_features['include_updates'] == true) || !isset($this->options_features['include_updates'])){
             $checked = 'checked';
         }
         $description = '';
@@ -810,7 +810,7 @@ class WPStackSightPlugin {
 
     public function include_events_callback(){
         $checked = '';
-        if(isset($this->options_features['include_events']) && $this->options_features['include_events'] == true){
+        if((isset($this->options_features['include_events']) && $this->options_features['include_events'] == true) || !isset($this->options_features['include_events'])){
             $checked = 'checked';
         }
         $description = '';
