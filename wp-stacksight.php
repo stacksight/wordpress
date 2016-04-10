@@ -3,7 +3,7 @@
  * Plugin Name: Stacksight
  * Plugin URI: http://mean.io
  * Description: Stacksight wordpress support (featuring events, error logs and updates)
- * Version: 1.8.4
+ * Version: 1.8.5
  * Author: Stacksight LTD
  * Author URI: http://stacksight.io
  * License: GPL
@@ -322,13 +322,13 @@ class WPStackSightPlugin {
                             do_settings_sections( 'stacksight-set-admin' );
                             //                 show code instructions block
                             $app_settings = get_option('stacksight_opt');
-                            $this->showInstructions($app_settings);
+//                            $this->showInstructions($app_settings);
                         } else {
                             settings_fields( 'stacksight_option_features' );
                             do_settings_sections( 'stacksight-set-features' );
                             //                 show code instructions block
                             $app_settings = get_option('stacksight_opt_features');
-                            $this->showInstructions($app_settings);
+//                            $this->showInstructions($app_settings);
                         }
 
                         submit_button();
@@ -715,9 +715,11 @@ class WPStackSightPlugin {
 
         $any_errors = $this->any_form_errors();
 
-        $new_input['_id'] = $input['_id'];
-        $new_input['token'] = $input['token'];
-        $new_input['group'] = $input['group'];
+        if(defined('STACKSIGHT_SETTINGS_IN_DB') && STACKSIGHT_SETTINGS_IN_DB === true){
+            $new_input['_id'] = $input['_id'];
+            $new_input['token'] = $input['token'];
+            $new_input['group'] = $input['group'];
+        }
         $new_input['enable_options'] = array_keys($input['enable_options']);
         $new_input['cron_updates_interval'] = $input['cron_updates_interval'];
         // schedule the updates action
@@ -760,7 +762,7 @@ class WPStackSightPlugin {
 
     public function include_logs_callback(){
         $checked = '';
-        if(isset($this->options_features['include_logs']) && $this->options_features['include_logs'] == true){
+        if(defined('STACKSIGHT_INCLUDE_LOGS') && STACKSIGHT_INCLUDE_LOGS === true) {
             $checked = 'checked';
         }
         $description = '';
@@ -772,7 +774,7 @@ class WPStackSightPlugin {
 
     public function include_health_callback(){
         $checked = '';
-        if(isset($this->options_features['include_health']) && $this->options_features['include_health'] == true){
+        if(defined('STACKSIGHT_INCLUDE_HEALTH') && STACKSIGHT_INCLUDE_HEALTH === true){
             $checked = 'checked';
         }
         $description = '';
@@ -784,7 +786,7 @@ class WPStackSightPlugin {
 
     public function include_inventory_callback(){
         $checked = '';
-        if(isset($this->options_features['include_inventory']) && $this->options_features['include_inventory'] == true){
+        if(defined('STACKSIGHT_INCLUDE_INVENTORY') && STACKSIGHT_INCLUDE_INVENTORY === true) {
             $checked = 'checked';
         }
         $description = '';
@@ -796,7 +798,7 @@ class WPStackSightPlugin {
 
     public function include_updates_callback(){
         $checked = '';
-        if(isset($this->options_features['include_updates']) && $this->options_features['include_updates'] == true){
+        if(defined('STACKSIGHT_INCLUDE_UPDATES') && STACKSIGHT_INCLUDE_UPDATES === true){
             $checked = 'checked';
         }
         $description = '';
@@ -808,7 +810,7 @@ class WPStackSightPlugin {
 
     public function include_events_callback(){
         $checked = '';
-        if(isset($this->options_features['include_events']) && $this->options_features['include_events'] == true){
+        if(defined('STACKSIGHT_INCLUDE_EVENTS') && STACKSIGHT_INCLUDE_EVENTS === true){
             $checked = 'checked';
         }
         $description = '';
@@ -831,24 +833,62 @@ class WPStackSightPlugin {
     }
 
     public function app_id_callback() {
-        printf(
-            '<input type="text" id="_id" name="stacksight_opt[_id]" value="%s" size="50" />',
-            isset( $this->options['_id'] ) ? esc_attr( $this->options['_id']) : ''
-        );
+        if(defined('STACKSIGHT_SETTINGS_IN_DB') && STACKSIGHT_SETTINGS_IN_DB === true){
+            printf(
+                '<input type="text" id="_id" name="stacksight_opt[_id]" value="%s" size="50" />',
+                isset( $this->options['_id'] ) ? esc_attr( $this->options['_id']) : ''
+            );
+        } else{
+            if(!defined('STACKSIGHT_APP_ID')){
+                printf(
+                    '<span class="pre-code-green"> Is calculated </span>'
+                );
+            } else {
+                printf(
+                    '<span>'.STACKSIGHT_APP_ID.'</span>'
+                );
+            }
+        }
+
+
     }
 
     public function token_callback() {
-        printf(
-            '<input type="text" id="token" name="stacksight_opt[token]" value="%s" size="50" />',
-            isset( $this->options['token'] ) ? esc_attr( $this->options['token']) : ''
-        );
+        if(defined('STACKSIGHT_SETTINGS_IN_DB') && STACKSIGHT_SETTINGS_IN_DB === true){
+            printf(
+                '<input type="text" id="token" name="stacksight_opt[token]" value="%s" size="50" />',
+                isset( $this->options['token'] ) ? esc_attr( $this->options['token']) : ''
+            );
+        } else{
+            if(!defined('STACKSIGHT_TOKEN')){
+                printf(
+                    '<span class="pre-code-red"> Not set </span>'
+                );
+            } else {
+                printf(
+                    '<span>'.STACKSIGHT_TOKEN.'</span>'
+                );
+            }
+        }
     }
 
     public function group_callback() {
-        printf(
-            '<input type="text" id="group" name="stacksight_opt[group]" value="%s" size="50" />',
-            isset( $this->options['group'] ) ? esc_attr( $this->options['group']) : ''
-        );
+        if(defined('STACKSIGHT_SETTINGS_IN_DB') && STACKSIGHT_SETTINGS_IN_DB === true){
+            printf(
+                '<input type="text" id="group" name="stacksight_opt[group]" value="%s" size="50" />',
+                isset( $this->options['group'] ) ? esc_attr( $this->options['group']) : ''
+            );
+        } else{
+            if(!defined('STACKSIGHT_GROUP')){
+                printf(
+                    '<span class="pre-code-red"> Not set </span>'
+                );
+            } else {
+                printf(
+                    '<span>'.STACKSIGHT_GROUP.'</span>'
+                );
+            }
+        }
     }
 
     public function enable_slack_notify_logs_callback(){
