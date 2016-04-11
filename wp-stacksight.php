@@ -55,6 +55,14 @@ class WPStackSightPlugin {
         }
     }
 
+    public function showStackMessages(){
+        if(isset($_SESSION['STACKSIGHT_MESSAGE']) && !empty($_SESSION['STACKSIGHT_MESSAGE']) && is_array($_SESSION['STACKSIGHT_MESSAGE'])){
+            foreach($_SESSION['STACKSIGHT_MESSAGE'] as $message){
+                add_settings_error('', '', $message);
+            }
+        }
+    }
+
     private function _setUpMultidomainsConfig($params = array()){
         if($params && is_array($params)){
             foreach($params as $param){
@@ -304,6 +312,7 @@ class WPStackSightPlugin {
      */
     public function create_admin_page() {
         $active_tab = isset( $_GET[ 'tab' ] ) ? $_GET[ 'tab' ] : 'general_settings';
+        $this->showStackMessages();
         ?>
         <div class="ss-wrap wrap">
             <h2>App setting for StackSight</h2>
