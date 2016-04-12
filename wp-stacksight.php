@@ -321,8 +321,10 @@ class WPStackSightPlugin {
                 <?php settings_errors(); ?>
                 <h2 class="nav-tab-wrapper">
                     <a href="?page=stacksight&tab=general_settings" class="nav-tab <?php echo $active_tab == 'general_settings' ? 'nav-tab-active' : ''; ?>">General settings</a>
-<!--                    <a href="?page=stacksight&tab=slack_integration" class="nav-tab --><?php //echo $active_tab == 'slack_integration' ? 'nav-tab-active' : ''; ?><!--">Slack integration</a>-->
                     <a href="?page=stacksight&tab=features_settings" class="nav-tab <?php echo $active_tab == 'features_settings' ? 'nav-tab-active' : ''; ?>">Features</a>
+                    <?php if(defined('STACKSIGHT_DEBUG') && STACKSIGHT_DEBUG === true):?>
+                        <a href="?page=stacksight&tab=debug_mode" class="nav-tab <?php echo $active_tab == 'debug_mode' ? 'nav-tab-active' : ''; ?>">Debug</a>
+                    <?php endif;?>
                 </h2>
                 <form method="post" action="options.php">
                     <?php
@@ -332,21 +334,130 @@ class WPStackSightPlugin {
                             //                 show code instructions block
                             $app_settings = get_option('stacksight_opt');
 //                            $this->showInstructions($app_settings);
-                        } else {
+                        } elseif($active_tab == 'features_settings') {
                             settings_fields( 'stacksight_option_features' );
                             do_settings_sections( 'stacksight-set-features' );
                             //                 show code instructions block
                             $app_settings = get_option('stacksight_opt_features');
-//                            $this->showInstructions($app_settings);
+                        } else{
+                            if(defined('STACKSIGHT_DEBUG') && STACKSIGHT_DEBUG === true){
+                                define('STACKSIGHT_DEBUG_MODE',true);
+                                $_SESSION['stacksight_debug'] = array();
+                                $this->cron_do_main_job();
+                                $this->showDebugInfo();
+                            }
                         }
-
-                        submit_button();
+                        if($active_tab != 'debug_mode')
+                            submit_button();
                     ?>
                 </form>
 
             </div><!-- /.wrap -->
         </div>
         <?php
+    }
+
+    private function showDebugInfo(){
+        if(isset($_SESSION['stacksight_debug']) && !empty($_SESSION['stacksight_debug']) && is_array($_SESSION['stacksight_debug'])){
+            foreach($_SESSION['stacksight_debug'] as $key => $feature):?>
+                <div class="feature-block">
+                    <h3 class="header">
+                        <?php switch($key){
+                            case 'updates':
+                                echo 'Updates';
+                                break;
+                            case 'health':
+                                echo 'Health';
+                                break;
+                            case 'inventory':
+                                echo 'Inventory';
+                                break;
+                            case 'events':
+                                echo 'Events';
+                                break;
+                            case 'logs':
+                                echo 'Logs';
+                                break;
+                        }?>
+                    </h3>
+                    <hr>
+                    <div class="connection-info">
+                        <?php foreach($feature['data'] as $key => $feature_detail):?>
+                            <div>
+                            <span>
+                                Sending type:
+                                <span class="header">
+                                    <?php switch($feature_detail['type']){
+                                        case 'curl':
+                                            echo 'cURL';
+                                            break;
+                                        case 'multicurl':
+                                            echo 'Multi cURL';
+                                            break;
+                                        case 'sockets':
+                                            echo 'Sockets';
+                                            break;
+                                        case 'threads':
+                                            echo 'Threads';
+                                            break;
+                                    };?>
+                                </span>
+                            </span>
+                            </div>
+                            <div>
+                                <?php if($feature_detail['type'] == 'curl' || $feature_detail['type'] == 'multicurl'):?>
+                                    <?php if(isset($feature['request_info']) && !empty($feature['request_info']) && is_array($feature['request_info'])):?>
+                                        <table class="debug-table" cellpadding="0" cellspacing="0">
+                                            <tbody>
+                                                <?php $i = 0; foreach($feature['request_info'] as $key_request => $request_value):?>
+                                                    <?php if(in_array($key_request, SSUtilities::getCurlInfoFields())): ++$i;?>
+                                                        <tr class="<?php if(($i % 2) == 0) echo 'odd'; else echo 'even';?>">
+                                                            <th scope="row"><?php echo SSUtilities::getCurlDescription($key_request);?></th>
+                                                            <td>
+                                                                <?php
+                                                                if(is_array($request_value)){
+                                                                    echo implode('<br/>', $request_value);
+                                                                } else{
+                                                                    echo $request_value;
+                                                                }
+                                                                ?>
+                                                            </td>
+                                                        </tr>
+                                                    <?php endif;?>
+                                                <?php endforeach;?>
+                                            </tbody>
+                                        </table>
+                                        <div class="response">
+                                            <strong>Response:</strong>
+                                            <?php echo $feature['request_info']['response'];?>
+                                        </div>
+                                    <?php else:?>
+                                        <table class="debug-table" cellpadding="0" cellspacing="0">
+                                            <tbody>
+                                            <tr>
+                                                <td>Connect information not found... :(</td>
+                                            </tr>
+                                            </tbody>
+                                        </table>
+                                    <?php endif;?>
+                                <?php endif;?>
+                            </div>
+                        <?php endforeach;?>
+                    </div>
+                    <div class="dump-of-data">
+                        <?php if(isset($feature_detail['data']['data']) && !empty($feature_detail['data']['data'])):?>
+                            <pre>
+                                <?php print_r($feature_detail['data']['data']);?>
+                            </pre>
+                        <?php else:?>
+                            <strong>Data not found... :(</strong>
+                        <?php endif;?>
+
+                    </div>
+                </div>
+            <?php
+            endforeach;
+        }
     }
 
     public function getBackupsData() {
