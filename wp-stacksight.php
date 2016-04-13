@@ -360,6 +360,7 @@ class WPStackSightPlugin {
     private function showDebugInfo(){
         if(isset($_SESSION['stacksight_debug']) && !empty($_SESSION['stacksight_debug']) && is_array($_SESSION['stacksight_debug'])){
             foreach($_SESSION['stacksight_debug'] as $key => $feature):?>
+
                 <div class="feature-block">
                     <h3 class="header">
                         <?php switch($key){
@@ -429,7 +430,7 @@ class WPStackSightPlugin {
                                         </table>
                                         <div class="response">
                                             <strong>Response:</strong>
-                                            <?php echo $feature['request_info']['response'];?>
+                                            <?php echo $feature['request_info']['response']?>
                                         </div>
                                     <?php else:?>
                                         <table class="debug-table" cellpadding="0" cellspacing="0">
@@ -439,6 +440,40 @@ class WPStackSightPlugin {
                                             </tr>
                                             </tbody>
                                         </table>
+                                    <?php endif;?>
+                                <?php endif;?>
+                                <?php if($feature_detail['type'] == 'sockets'):?>
+                                    <?php if(isset($feature['request_info']) && !empty($feature['request_info']) && is_array($feature['request_info'])):?>
+                                        <?php foreach($feature['request_info'] as $key_request => $request_value):?>
+                                            <table class="debug-table" cellpadding="0" cellspacing="0">
+                                                <tbody>
+                                                 <tr class="odd">
+                                                     <th scope="row">
+                                                         Result#<?php echo $key_request + 1;?>:
+                                                     </th>
+                                                     <td>
+                                                        <?php if($request_value['error'] == true):?>
+                                                            <strong class="pre-code-red">Error</strong>
+                                                        <?php else:?>
+                                                            <strong class="pre-code-green">Success</strong>
+                                                        <?php endif;?>
+                                                     </td>
+                                                 </tr>
+                                                 <tr class="even">
+                                                     <th scope="row">
+                                                         Details:
+                                                     </th>
+                                                     <td><?php echo $request_value['data'];?></td>
+                                                 </tr>
+                                                 <tr class="odd">
+                                                     <th scope="row">
+                                                         Meta:
+                                                     </th>
+                                                     <td><?php print_r($request_value['meta']);?></td>
+                                                 </tr>
+                                                </tbody>
+                                            </table>
+                                        <?php endforeach;?>
                                     <?php endif;?>
                                 <?php endif;?>
                             </div>
