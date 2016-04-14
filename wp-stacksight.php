@@ -479,6 +479,32 @@ class WPStackSightPlugin {
                             </div>
                         <?php endforeach;?>
                     </div>
+                </div>
+            <?php
+            endforeach;
+            foreach($_SESSION['stacksight_debug'] as $key => $feature):?>
+
+                <div class="feature-block">
+                    <h3 class="header">
+                        <?php switch($key){
+                            case 'updates':
+                                echo 'Updates';
+                                break;
+                            case 'health':
+                                echo 'Health';
+                                break;
+                            case 'inventory':
+                                echo 'Inventory';
+                                break;
+                            case 'events':
+                                echo 'Events';
+                                break;
+                            case 'logs':
+                                echo 'Logs';
+                                break;
+                        }?>
+                    </h3>
+                    <hr>
                     <div class="dump-of-data">
                         <?php if(isset($feature_detail['data']['data']) && !empty($feature_detail['data']['data'])):?>
                             <pre>
@@ -490,7 +516,7 @@ class WPStackSightPlugin {
 
                     </div>
                 </div>
-            <?php
+                <?php
             endforeach;
         }
     }
