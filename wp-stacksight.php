@@ -26,6 +26,14 @@ class WPStackSightPlugin {
     private $health;
     private $dep_plugins = array();
 
+    public $defaultDefines = array(
+        'STACKSIGHT_INCLUDE_LOGS' => false,
+        'STACKSIGHT_INCLUDE_HEALTH' => true,
+        'STACKSIGHT_INCLUDE_INVENTORY' => true,
+        'STACKSIGHT_INCLUDE_EVENTS' => true,
+        'STACKSIGHT_INCLUDE_UPDATES' => true
+    );
+
     public function __construct() {
         register_activation_hook( __FILE__, array(__CLASS__, 'install'));
         register_deactivation_hook( __FILE__, array(__CLASS__, 'uninstall'));
@@ -98,6 +106,40 @@ class WPStackSightPlugin {
         if(!defined('STACKSIGHT_TOKEN'))
             return;
 
+        $total_state = $this->getTotalState();
+        $total_hash_state = md5(serialize($total_state));
+        $old_hash_exist = false;
+        $old_hash_state = false;
+        $date_of_old_hash_state = false;
+        $state_option = false;
+
+
+        if($state_option = get_option('stacksight_state')){
+            $tempory = unserialize($state_option);
+            $old_hash_exist = true;
+            $old_hash_state = $tempory['hash_of_state'];
+            $date_of_old_hash_state = $tempory['date_of_set'];
+        }
+
+        // If we have changed state
+        if($total_hash_state != $old_hash_state){
+            $time = time();
+            // Send new state
+            $handshake_event = array(
+                'action' => ($old_hash_exist === true) ? 'updated' : 'registred',
+                'type' => 'stacksight',
+                'name' => 'configuration',
+                'data' => $total_state
+            );
+            $this->ss_client->publishEvent($handshake_event, true);
+            // Write new state to DB
+            $new_state_to_db = array(
+                'hash_of_state' => $total_hash_state,
+                'date_of_set' => $time
+            );
+            add_option('stacksight_state', serialize($new_state_to_db), $state_option);
+        }
+
         SSUtilities::error_log('cron_do_main_job has been run', 'cron_log');
         // updates
         if(defined('STACKSIGHT_INCLUDE_UPDATES') && STACKSIGHT_INCLUDE_UPDATES == true){
@@ -114,7 +156,6 @@ class WPStackSightPlugin {
                 require_once($all_in_one_dir.'/wp-security-core.php');
                 require_once($all_in_one_dir.'/admin/wp-security-admin-init.php');
                 require_once('inc/wp-health-security.php');
-                // echo '<pre>'.print_r($GLOBALS['aio_wp_security'], true).'</pre>';
                 $this->health = new stdClass;
                 $this->health->security = new WPHealthSecurity();
                 $health = array();
@@ -250,7 +291,7 @@ class WPStackSightPlugin {
                     break;
             }
 
-            $res = $this->ss_client->publishEvent($event);
+            $res = $this->ss_client->publishEvent($event, true);
             if (!$res['success']) SSUtilities::error_log($res['message'], 'error');
         }
     }
@@ -333,7 +374,6 @@ class WPStackSightPlugin {
                             do_settings_sections( 'stacksight-set-admin' );
                             //                 show code instructions block
                             $app_settings = get_option('stacksight_opt');
-//                            $this->showInstructions($app_settings);
                         } elseif($active_tab == 'features_settings') {
                             settings_fields( 'stacksight_option_features' );
                             do_settings_sections( 'stacksight-set-features' );
@@ -360,7 +400,6 @@ class WPStackSightPlugin {
     private function showDebugInfo(){
         if(isset($_SESSION['stacksight_debug']) && !empty($_SESSION['stacksight_debug']) && is_array($_SESSION['stacksight_debug'])){
             foreach($_SESSION['stacksight_debug'] as $key => $feature):?>
-
                 <div class="feature-block">
                     <h3 class="header">
                         <?php switch($key){
@@ -443,37 +482,35 @@ class WPStackSightPlugin {
                                     <?php endif;?>
                                 <?php endif;?>
                                 <?php if($feature_detail['type'] == 'sockets'):?>
-                                    <?php if(isset($feature['request_info']) && !empty($feature['request_info']) && is_array($feature['request_info'])):?>
-                                        <?php foreach($feature['request_info'] as $key_request => $request_value):?>
-                                            <table class="debug-table" cellpadding="0" cellspacing="0">
-                                                <tbody>
-                                                 <tr class="odd">
-                                                     <th scope="row">
-                                                         Result#<?php echo $key_request + 1;?>:
-                                                     </th>
-                                                     <td>
-                                                        <?php if($request_value['error'] == true):?>
-                                                            <strong class="pre-code-red">Error</strong>
-                                                        <?php else:?>
-                                                            <strong class="pre-code-green">Success</strong>
-                                                        <?php endif;?>
-                                                     </td>
-                                                 </tr>
-                                                 <tr class="even">
-                                                     <th scope="row">
-                                                         Details:
-                                                     </th>
-                                                     <td><?php echo $request_value['data'];?></td>
-                                                 </tr>
-                                                 <tr class="odd">
-                                                     <th scope="row">
-                                                         Meta:
-                                                     </th>
-                                                     <td><?php print_r($request_value['meta']);?></td>
-                                                 </tr>
-                                                </tbody>
-                                            </table>
-                                        <?php endforeach;?>
+                                    <?php if(isset($feature['request_info'][$key]) && !empty($feature['request_info'][$key]) && is_array($feature['request_info'][$key])):?>
+                                        <table class="debug-table" cellpadding="0" cellspacing="0">
+                                            <tbody>
+                                             <tr class="odd">
+                                                 <th scope="row">
+                                                     Result#<?php echo $key + 1;?>:
+                                                 </th>
+                                                 <td>
+                                                    <?php if($feature['request_info'][$key]['error'] == true):?>
+                                                        <strong class="pre-code-red">Error</strong>
+                                                    <?php else:?>
+                                                        <strong class="pre-code-green">Success</strong>
+                                                    <?php endif;?>
+                                                 </td>
+                                             </tr>
+                                             <tr class="even">
+                                                 <th scope="row">
+                                                     Details:
+                                                 </th>
+                                                 <td><?php echo$feature['request_info'][$key]['data'];?></td>
+                                             </tr>
+                                             <tr class="odd">
+                                                 <th scope="row">
+                                                     Meta:
+                                                 </th>
+                                                 <td><?php print_r($feature['request_info'][$key]['meta']);?></td>
+                                             </tr>
+                                            </tbody>
+                                        </table>
                                     <?php endif;?>
                                 <?php endif;?>
                             </div>
@@ -482,8 +519,7 @@ class WPStackSightPlugin {
                 </div>
             <?php
             endforeach;
-            foreach($_SESSION['stacksight_debug'] as $key => $feature):?>
-
+            foreach($_SESSION['stacksight_debug'] as $key => $feature_dump_data):?>
                 <div class="feature-block">
                     <h3 class="header">
                         <?php switch($key){
@@ -506,10 +542,12 @@ class WPStackSightPlugin {
                     </h3>
                     <hr>
                     <div class="dump-of-data">
-                        <?php if(isset($feature_detail['data']['data']) && !empty($feature_detail['data']['data'])):?>
-                            <pre>
-                                <?php print_r($feature_detail['data']['data']);?>
-                            </pre>
+                        <?php if(isset($feature_dump_data['data']) && !empty($feature_dump_data['data'])):?>
+                            <?php foreach($feature_dump_data['data'] as $dum_data):?>
+                                <pre>
+                                    <?php print_r($dum_data['data']);?>
+                                </pre>
+                            <?php endforeach;?>
                         <?php else:?>
                             <strong>Data not found... :(</strong>
                         <?php endif;?>
@@ -1202,42 +1240,24 @@ class WPStackSightPlugin {
         return array('list' => array_reverse($list), 'show_code' => $show_code);
     }
 
-public function showInstructions($app) {
-    $diagnostic = $this->getDiagnostic($app);
-    $app_token = defined('STACKSIGHT_TOKEN') ? STACKSIGHT_TOKEN : 'YOUR_STACKSIGHT_TOKEN';
-?>
-    <div class="ss-diagnostic-block">
-        <h3><?php echo __('Configuration status', 'stacksight') ?></h3>
-        <ul class="ss-config-diagnostic <?php echo (($diagnostic['list']))? 'error' : 'success'?>">
-            <?php if ($diagnostic['list']): ?>
-                <?php foreach ($diagnostic['list'] as $d_item): ?>
-                    <li><?php echo $d_item ?></li>
-                <?php endforeach ?>
-            <?php else: ?>
-                <h4 class="ss-ok">OK</h4>
-            <?php endif ?>
-        </ul>
-    </div>
-    <?php if ((!defined('STACKSIGHT_PHP_SDK_INCLUDE') || (defined('STACKSIGHT_PHP_SDK_INCLUDE') && STACKSIGHT_PHP_SDK_INCLUDE !== true)) && $diagnostic['show_code']): ?>
-    <div class="ss-config-block">
-        <p><?php echo __("Insert that code (start - end) at the bottom of your wp-config.php but before a line <strong>".htmlspecialchars('require_once(ABSPATH . \'wp-settings.php\');')." </strong>") ?></p>
-        <div class="class-code">
-            <div class="code-comments">// StackSight start config</div>
-            <div class="">
-                <div>$ss_inc<span class=""> = </span><span class="">dirname(__FILE__)</span><span class=""> . </span><span class="">'/<?php echo $this->getRelativeRootPath(); ?>stacksight-php-sdk/bootstrap-wp.php'</span>;</div>
-                <div><span class="">if</span>(<span class="">is_file</span>($ss_inc)) {</div>
-                <div class="tab">
-                    <div><span class="">require_once</span>($ss_inc);</div>
-                </div>
-                }
-            </div>
-            <div class="code-comments">// StackSight end config</div>
-        </div>
-        <div class="screen-of-config">
-            <img src="<?php echo plugins_url('assets/img/config-screen.png', __FILE__ )?>" alt="Screen of config"/>
-        </div>
-    </div>
-<?php endif;
+    public function getTotalState(){
+        $plugin_info = get_plugin_data(dirname(__FILE__).'/wp-stacksight.php');
+        return array(
+            'app' => $plugin_info,
+            'settings' => array(
+                'app_id' => (defined('STACKSIGHT_APP_ID')) ? STACKSIGHT_APP_ID : false,
+                'app_token' => (defined('STACKSIGHT_TOKEN')) ? STACKSIGHT_TOKEN : false,
+                'app_group' => (defined('STACKSIGHT_GROUP')) ? STACKSIGHT_GROUP : false,
+                'debug_mode' => (defined('STACKSIGHT_DEBUG')) ? STACKSIGHT_DEBUG : false
+            ),
+            'features' => array(
+                'logs' => (defined('STACKSIGHT_INCLUDE_LOGS')) ? STACKSIGHT_INCLUDE_LOGS : $this->defaultDefines['STACKSIGHT_INCLUDE_LOGS'],
+                'health' => (defined('STACKSIGHT_INCLUDE_HEALTH')) ? STACKSIGHT_INCLUDE_HEALTH : $this->defaultDefines['STACKSIGHT_INCLUDE_HEALTH'],
+                'inventory' => (defined('STACKSIGHT_INCLUDE_INVENTORY')) ? STACKSIGHT_INCLUDE_INVENTORY : $this->defaultDefines['STACKSIGHT_INCLUDE_INVENTORY'],
+                'events' => (defined('STACKSIGHT_INCLUDE_EVENTS')) ? STACKSIGHT_INCLUDE_EVENTS : $this->defaultDefines['STACKSIGHT_INCLUDE_EVENTS'],
+                'updates' => (defined('STACKSIGHT_INCLUDE_UPDATES')) ? STACKSIGHT_INCLUDE_UPDATES : $this->defaultDefines['STACKSIGHT_INCLUDE_UPDATES']
+            )
+        );
     }
 
 }
