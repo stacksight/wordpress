@@ -120,7 +120,6 @@ class WPStackSightPlugin {
 
         // If we have changed state
         if($total_hash_state != $old_hash_state){
-//            print_r('TOTAL HASH != OLD HASH');
             $time = time();
             // Send new state
             $handshake_event = array(
@@ -143,8 +142,6 @@ class WPStackSightPlugin {
             }
 
             $this->ss_client->publishEvent($handshake_event, true);
-        } else{
-//            print_r('TOTAL HASH == OLD HASH');
         }
     }
 
