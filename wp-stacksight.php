@@ -102,10 +102,7 @@ class WPStackSightPlugin {
         return $schedules;
     }
 
-    public function cron_do_main_job() {
-        if(!defined('STACKSIGHT_TOKEN'))
-            return;
-
+    public function handshake(){
         $total_state = $this->getTotalState();
         $total_hash_state = md5(serialize($total_state));
         $old_hash_exist = false;
@@ -123,6 +120,7 @@ class WPStackSightPlugin {
 
         // If we have changed state
         if($total_hash_state != $old_hash_state){
+//            print_r('TOTAL HASH != OLD HASH');
             $time = time();
             // Send new state
             $handshake_event = array(
@@ -131,16 +129,33 @@ class WPStackSightPlugin {
                 'name' => 'configuration',
                 'data' => $total_state
             );
-            $this->ss_client->publishEvent($handshake_event, true);
+
             // Write new state to DB
             $new_state_to_db = array(
                 'hash_of_state' => $total_hash_state,
                 'date_of_set' => $time
             );
-            add_option('stacksight_state', serialize($new_state_to_db), $state_option);
+
+            if($old_hash_exist === true){
+                update_option('stacksight_state', serialize($new_state_to_db));
+            } else{
+                add_option('stacksight_state', serialize($new_state_to_db));
+            }
+
+            $this->ss_client->publishEvent($handshake_event, true);
+        } else{
+//            print_r('TOTAL HASH == OLD HASH');
         }
+    }
+
+    public function cron_do_main_job() {
+        if(!defined('STACKSIGHT_TOKEN'))
+            return;
 
         SSUtilities::error_log('cron_do_main_job has been run', 'cron_log');
+
+        $this->handshake();
+
         // updates
         if(defined('STACKSIGHT_INCLUDE_UPDATES') && STACKSIGHT_INCLUDE_UPDATES == true){
             $updates = array(
