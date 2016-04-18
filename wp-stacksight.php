@@ -64,6 +64,7 @@ class WPStackSightPlugin {
     }
 
     public function showStackMessages(){
+        SSUtilities::checkPermissions();
         if(isset($_SESSION['STACKSIGHT_MESSAGE']) && !empty($_SESSION['STACKSIGHT_MESSAGE']) && is_array($_SESSION['STACKSIGHT_MESSAGE'])){
             foreach($_SESSION['STACKSIGHT_MESSAGE'] as $message){
                 add_settings_error('', '', $message);
