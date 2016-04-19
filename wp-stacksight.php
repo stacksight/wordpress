@@ -304,7 +304,24 @@ class WPStackSightPlugin {
                     break;
             }
 
-            $res = $this->ss_client->publishEvent($event, true);
+            $ready_show_debug = false;
+
+            if(is_admin() && (defined('STACKSIGHT_DEBUG') && STACKSIGHT_DEBUG === true)){
+                if(!strpos($_SERVER[REQUEST_URI], 'page=stacksight&tab=debug_mode')){
+                    define('STACKSIGHT_DEBUG_MODE',true);
+                    $ready_show_debug = true;
+                }
+            }
+
+            $res = $this->ss_client->publishEvent($event);
+
+            if($ready_show_debug === true){
+                if(SSUtilities::checkPermissions()){
+                    if(isset($_SESSION['stacksight_debug']['events']) && !empty($_SESSION['stacksight_debug']['events'])){
+                        SSUtilities::error_log(print_r($_SESSION['stacksight_debug']['events'], true), 'debug_events', true);
+                    }
+                }
+            }
             if (!$res['success']) SSUtilities::error_log($res['message'], 'error');
         }
     }
