@@ -307,7 +307,7 @@ class WPStackSightPlugin {
             $ready_show_debug = false;
 
             if(is_admin() && (defined('STACKSIGHT_DEBUG') && STACKSIGHT_DEBUG === true)){
-                if(!strpos($_SERVER[REQUEST_URI], 'page=stacksight&tab=debug_mode')){
+                if(!strpos($_SERVER['REQUEST_URI'], 'page=stacksight&tab=debug_mode')){
                     define('STACKSIGHT_DEBUG_MODE',true);
                     $ready_show_debug = true;
                 }
