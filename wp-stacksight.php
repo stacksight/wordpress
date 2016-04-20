@@ -87,8 +87,8 @@ class WPStackSightPlugin {
     }
 
     public function stacksight_plugin_action_links( $links ) {
-       $links[] = '<a href="'. esc_url( get_admin_url(null, 'options-general.php?page=stacksight') ) .'">'.__('Settings').'</a>';
-       return $links;
+        $links[] = '<a href="'. esc_url( get_admin_url(null, 'options-general.php?page=stacksight') ) .'">'.__('Settings').'</a>';
+        return $links;
     }
 
     public function cron_custom_interval($schedules) {
@@ -162,6 +162,8 @@ class WPStackSightPlugin {
             $this->ss_client->sendUpdates($updates, true);
         }
 
+        $health = array();
+
         if(defined('STACKSIGHT_INCLUDE_HEALTH') && STACKSIGHT_INCLUDE_HEALTH == true){
             // health, include health security class if All in One Security plugin exists
             $all_in_one_dir = WP_PLUGIN_DIR.'/all-in-one-wp-security-and-firewall';
@@ -169,42 +171,54 @@ class WPStackSightPlugin {
                 require_once($all_in_one_dir.'/wp-security-core.php');
                 require_once($all_in_one_dir.'/admin/wp-security-admin-init.php');
                 require_once('inc/wp-health-security.php');
-                $this->health = new stdClass;
-                $this->health->security = new WPHealthSecurity();
-                $health = array();
-                $health['data'][] = $this->getSecurityData();
+
+                $active = is_plugin_active('all-in-one-wp-security-and-firewall/wp-security.php');
+                if($active === true){
+                    if(!$this->health)
+                        $this->health = new stdClass;
+
+                    $this->health->security = new WPHealthSecurity();
+                    $health['data'][] = $this->getSecurityData();
+                }
             }
 
             $seo_dir = WP_PLUGIN_DIR.'/wordpress-seo';
             if (is_file($seo_dir.'/wp-seo-main.php')) {
                 require_once('inc/wp-health-seo.php');
 
-                if(!$this->health)
-                    $this->health = new stdClass;
+                $active = is_plugin_active('wordpress-seo/wp-seo.php');
+                if($active === true){
+                    if(!$this->health)
+                        $this->health = new stdClass;
 
-                $this->health->seo = new WPHealthSeo();
-                if(!isset($health))
-                    $health = array();
+                    $this->health->seo = new WPHealthSeo();
+                    if(!isset($health))
+                        $health = array();
 
-                if($seo_data = $this->getSeoData())
-                    $health['data'][] = $seo_data;
+                    if($seo_data = $this->getSeoData())
+                        $health['data'][] = $seo_data;
+                }
             }
 
             $backups_dir = WP_PLUGIN_DIR . '/updraftplus';
             if (is_file($backups_dir . '/updraftplus.php')) {
+                define('UPDRAFTPLUS_DIR', true);
                 require_once('inc/wp-health-backups.php');
                 require_once($backups_dir . '/restorer.php');
                 require_once($backups_dir . '/options.php');
 
-                if (!$this->health)
-                    $this->health = new stdClass;
+                $active = is_plugin_active('updraftplus/updraftplus.php');
+                if($active === true){
+                    if (!$this->health)
+                        $this->health = new stdClass;
 
-                $this->health->backups = new WPHealthBackups();
-                if (!isset($health))
-                    $health = array();
+                    $this->health->backups = new WPHealthBackups();
+                    if (!isset($health))
+                        $health = array();
 
-                if ($backups_data = $this->getBackupsData())
-                    $health['data'][] = $backups_data;
+                    if ($backups_data = $this->getBackupsData())
+                        $health['data'][] = $backups_data;
+                }
             }
 
             if(isset($health['data']) && !empty($health['data'])){
@@ -331,12 +345,12 @@ class WPStackSightPlugin {
      */
     public function add_plugin_page() {
         add_menu_page(
-            'StackSight Integration', 
-            'StackSight', 
-            'manage_options', 
-            'stacksight', 
+            'StackSight Integration',
+            'StackSight',
+            'manage_options',
+            'stacksight',
             array($this, 'create_admin_page'),
-            '', 
+            '',
             '80.2'
         );
     }
@@ -399,26 +413,26 @@ class WPStackSightPlugin {
                 </h2>
                 <form method="post" action="options.php">
                     <?php
-                        if( $active_tab == 'general_settings' ) {
-                            settings_fields( 'stacksight_option_group' );
-                            do_settings_sections( 'stacksight-set-admin' );
-                            //                 show code instructions block
-                            $app_settings = get_option('stacksight_opt');
-                        } elseif($active_tab == 'features_settings') {
-                            settings_fields( 'stacksight_option_features' );
-                            do_settings_sections( 'stacksight-set-features' );
-                            //                 show code instructions block
-                            $app_settings = get_option('stacksight_opt_features');
-                        } else{
-                            if(defined('STACKSIGHT_DEBUG') && STACKSIGHT_DEBUG === true){
-                                define('STACKSIGHT_DEBUG_MODE',true);
-                                $_SESSION['stacksight_debug'] = array();
-                                $this->cron_do_main_job();
-                                $this->showDebugInfo();
-                            }
+                    if( $active_tab == 'general_settings' ) {
+                        settings_fields( 'stacksight_option_group' );
+                        do_settings_sections( 'stacksight-set-admin' );
+                        //                 show code instructions block
+                        $app_settings = get_option('stacksight_opt');
+                    } elseif($active_tab == 'features_settings') {
+                        settings_fields( 'stacksight_option_features' );
+                        do_settings_sections( 'stacksight-set-features' );
+                        //                 show code instructions block
+                        $app_settings = get_option('stacksight_opt_features');
+                    } else{
+                        if(defined('STACKSIGHT_DEBUG') && STACKSIGHT_DEBUG === true){
+                            define('STACKSIGHT_DEBUG_MODE',true);
+                            $_SESSION['stacksight_debug'] = array();
+                            $this->cron_do_main_job();
+                            $this->showDebugInfo();
                         }
-                        if($active_tab != 'debug_mode')
-                            submit_button();
+                    }
+                    if($active_tab != 'debug_mode')
+                        submit_button();
                     ?>
                 </form>
 
@@ -479,22 +493,22 @@ class WPStackSightPlugin {
                                     <?php if(isset($feature['request_info']) && !empty($feature['request_info']) && is_array($feature['request_info'])):?>
                                         <table class="debug-table" cellpadding="0" cellspacing="0">
                                             <tbody>
-                                                <?php $i = 0; foreach($feature['request_info'] as $key_request => $request_value):?>
-                                                    <?php if(in_array($key_request, SSUtilities::getCurlInfoFields())): ++$i;?>
-                                                        <tr class="<?php if(($i % 2) == 0) echo 'odd'; else echo 'even';?>">
-                                                            <th scope="row"><?php echo SSUtilities::getCurlDescription($key_request);?></th>
-                                                            <td>
-                                                                <?php
-                                                                if(is_array($request_value)){
-                                                                    echo implode('<br/>', $request_value);
-                                                                } else{
-                                                                    echo $request_value;
-                                                                }
-                                                                ?>
-                                                            </td>
-                                                        </tr>
-                                                    <?php endif;?>
-                                                <?php endforeach;?>
+                                            <?php $i = 0; foreach($feature['request_info'] as $key_request => $request_value):?>
+                                                <?php if(in_array($key_request, SSUtilities::getCurlInfoFields())): ++$i;?>
+                                                    <tr class="<?php if(($i % 2) == 0) echo 'odd'; else echo 'even';?>">
+                                                        <th scope="row"><?php echo SSUtilities::getCurlDescription($key_request);?></th>
+                                                        <td>
+                                                            <?php
+                                                            if(is_array($request_value)){
+                                                                echo implode('<br/>', $request_value);
+                                                            } else{
+                                                                echo $request_value;
+                                                            }
+                                                            ?>
+                                                        </td>
+                                                    </tr>
+                                                <?php endif;?>
+                                            <?php endforeach;?>
                                             </tbody>
                                         </table>
                                         <div class="response">
@@ -515,30 +529,30 @@ class WPStackSightPlugin {
                                     <?php if(isset($feature['request_info'][$key]) && !empty($feature['request_info'][$key]) && is_array($feature['request_info'][$key])):?>
                                         <table class="debug-table" cellpadding="0" cellspacing="0">
                                             <tbody>
-                                             <tr class="odd">
-                                                 <th scope="row">
-                                                     Result#<?php echo $key + 1;?>:
-                                                 </th>
-                                                 <td>
+                                            <tr class="odd">
+                                                <th scope="row">
+                                                    Result#<?php echo $key + 1;?>:
+                                                </th>
+                                                <td>
                                                     <?php if($feature['request_info'][$key]['error'] == true):?>
                                                         <strong class="pre-code-red">Error</strong>
                                                     <?php else:?>
                                                         <strong class="pre-code-green">Success</strong>
                                                     <?php endif;?>
-                                                 </td>
-                                             </tr>
-                                             <tr class="even">
-                                                 <th scope="row">
-                                                     Details:
-                                                 </th>
-                                                 <td><?php echo$feature['request_info'][$key]['data'];?></td>
-                                             </tr>
-                                             <tr class="odd">
-                                                 <th scope="row">
-                                                     Meta:
-                                                 </th>
-                                                 <td><?php print_r($feature['request_info'][$key]['meta']);?></td>
-                                             </tr>
+                                                </td>
+                                            </tr>
+                                            <tr class="even">
+                                                <th scope="row">
+                                                    Details:
+                                                </th>
+                                                <td><?php echo$feature['request_info'][$key]['data'];?></td>
+                                            </tr>
+                                            <tr class="odd">
+                                                <th scope="row">
+                                                    Meta:
+                                                </th>
+                                                <td><?php print_r($feature['request_info'][$key]['meta']);?></td>
+                                            </tr>
                                             </tbody>
                                         </table>
                                     <?php endif;?>
@@ -547,7 +561,7 @@ class WPStackSightPlugin {
                         <?php endforeach;?>
                     </div>
                 </div>
-            <?php
+                <?php
             endforeach;
             foreach($_SESSION['stacksight_debug'] as $key => $feature_dump_data):?>
                 <div class="feature-block">
@@ -689,11 +703,11 @@ class WPStackSightPlugin {
         if (!empty($meter)) {
             $data['widgets'][] = array(
                 'type' => 'meter',
-                'title' => __('Security Strength Meter'), 
+                'title' => __('Security Strength Meter'),
                 'desc' => __('This meter shows in points the security level of your site'), // Optional
                 'order' => 1,       // specifies the block sequence (the place in DOM). Optinal
                 'group' => 1,       // specifies the group where the widget will be rendered.
-                                    // lets sey for meter widget where will be 2 checklists but they should be display in once parent DOM container. Optinal
+                // lets sey for meter widget where will be 2 checklists but they should be display in once parent DOM container. Optinal
                 'point_max' => $meter['point_max'], // max available points to gain
                 'point_cur' => $meter['point_cur']  // current amount of the points
             );
@@ -707,7 +721,7 @@ class WPStackSightPlugin {
                 'desc' => __('Below is the current status of the critical features that you should activate on your site to achieve a minimum level of recommended security','all-in-one-wp-security-and-firewall'),
                 'order' => 2,       // specifies the block sequence (the place in DOM). Optinal
                 'group' => 1,       // specifies the group where the widget will be rendered.
-                                    // lets sey for meter widget where will be 2 checklists but they should be display in once parent DOM container. Optinal
+                // lets sey for meter widget where will be 2 checklists but they should be display in once parent DOM container. Optinal
                 'checklist' => $critical_features
             );
         }
@@ -785,7 +799,7 @@ class WPStackSightPlugin {
                     'update_link' => site_url('wp-admin/update-core.php'),
                 );
             }
-            
+
         }
 
         return $upd;
@@ -938,10 +952,10 @@ class WPStackSightPlugin {
         */
 
         add_settings_field(
-            'cron_updates_interval', 
-            'Cron updates interval', 
-            array( $this, 'cron_updates_interval_callback' ), 
-            'stacksight-set-admin', 
+            'cron_updates_interval',
+            'Cron updates interval',
+            array( $this, 'cron_updates_interval_callback' ),
+            'stacksight-set-admin',
             'setting_section_stacksight'
         );
 
@@ -1229,7 +1243,7 @@ class WPStackSightPlugin {
     }
 
     public static function install() {
-        
+
     }
 
     public static function uninstall() {
@@ -1252,7 +1266,7 @@ class WPStackSightPlugin {
             $list[] = __('Token doesn\'t exist', 'stacksight').'<br>';
             $show_code = true;
         }
-    
+
         if ((!defined('STACKSIGHT_PHP_SDK_INCLUDE') || (defined('STACKSIGHT_PHP_SDK_INCLUDE') && STACKSIGHT_PHP_SDK_INCLUDE !== true))) {
             $list[] = __('wp-config.php is not configured as specified below', 'stacksight').'<br>';
             $show_code = true;
@@ -1261,7 +1275,7 @@ class WPStackSightPlugin {
         foreach ($this->dep_plugins as $plugin => $d_plg) {
             if (!is_plugin_active($plugin)) {
                 $list[] = SSUtilities::t('Plugin <a target="_blank" href="{link}">{plugin}</a> is required, please install and activate', array(
-                    '{link}' => $d_plg['link'], 
+                    '{link}' => $d_plg['link'],
                     '{plugin}' => $d_plg['name']
                 )).'<br>';
             }
