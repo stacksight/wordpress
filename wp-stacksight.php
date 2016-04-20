@@ -202,7 +202,8 @@ class WPStackSightPlugin {
 
             $backups_dir = WP_PLUGIN_DIR . '/updraftplus';
             if (is_file($backups_dir . '/updraftplus.php')) {
-                define('UPDRAFTPLUS_DIR', true);
+                if(!defined('UPDRAFTPLUS_DIR'))
+                    define('UPDRAFTPLUS_DIR', true);
                 require_once('inc/wp-health-backups.php');
                 require_once($backups_dir . '/restorer.php');
                 require_once($backups_dir . '/options.php');
@@ -1275,9 +1276,9 @@ class WPStackSightPlugin {
         foreach ($this->dep_plugins as $plugin => $d_plg) {
             if (!is_plugin_active($plugin)) {
                 $list[] = SSUtilities::t('Plugin <a target="_blank" href="{link}">{plugin}</a> is required, please install and activate', array(
-                    '{link}' => $d_plg['link'],
-                    '{plugin}' => $d_plg['name']
-                )).'<br>';
+                        '{link}' => $d_plg['link'],
+                        '{plugin}' => $d_plg['name']
+                    )).'<br>';
             }
         }
 
