@@ -398,6 +398,9 @@ class WPStackSightPlugin {
      */
     public function create_admin_page() {
         $active_tab = isset( $_GET[ 'tab' ] ) ? $_GET[ 'tab' ] : 'general_settings';
+        if(is_plugin_active('aryo-activity-log/aryo-activity-log.php')){
+            define('STACKSIGHT_ACTIVE_AAL', true);
+        }
         $this->showStackMessages();
         ?>
         <div class="ss-wrap wrap">
@@ -919,13 +922,16 @@ class WPStackSightPlugin {
             'setting_section_stacksight'
         );
 
-        add_settings_field(
-            '_id',
-            'App ID',
-            array( $this, 'app_id_callback' ),
-            'stacksight-set-admin',
-            'setting_section_stacksight'
-        );
+        if(defined('STACKSIGHT_APP_ID')){
+            add_settings_field(
+                '_id',
+                'App ID',
+                array( $this, 'app_id_callback' ),
+                'stacksight-set-admin',
+                'setting_section_stacksight'
+            );
+        }
+
         add_settings_field(
             'token',
             'Access Token *',
@@ -1130,7 +1136,7 @@ class WPStackSightPlugin {
                 );
             } else {
                 printf(
-                    '<span>'.STACKSIGHT_TOKEN.'</span>'
+                    '<span>'.STACKSIGHT_TOKEN.'</span><input type="hidden" name="stacksight_opt[token]" value="'.STACKSIGHT_TOKEN.'">'
                 );
             }
         }
