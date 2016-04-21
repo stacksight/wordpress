@@ -1044,7 +1044,7 @@ class WPStackSightPlugin {
 
     public function include_health_callback(){
         $checked = '';
-        if(defined('STACKSIGHT_INCLUDE_HEALTH') && STACKSIGHT_INCLUDE_HEALTH === true){
+        if((defined('STACKSIGHT_INCLUDE_HEALTH') && STACKSIGHT_INCLUDE_HEALTH === true) || !defined('STACKSIGHT_INCLUDE_HEALTH')){
             $checked = 'checked';
         }
         $description = '';
@@ -1056,7 +1056,7 @@ class WPStackSightPlugin {
 
     public function include_inventory_callback(){
         $checked = '';
-        if(defined('STACKSIGHT_INCLUDE_INVENTORY') && STACKSIGHT_INCLUDE_INVENTORY === true) {
+        if((defined('STACKSIGHT_INCLUDE_INVENTORY') && STACKSIGHT_INCLUDE_INVENTORY === true) ||  !defined('STACKSIGHT_INCLUDE_INVENTORY')) {
             $checked = 'checked';
         }
         $description = '';
@@ -1068,7 +1068,7 @@ class WPStackSightPlugin {
 
     public function include_updates_callback(){
         $checked = '';
-        if(defined('STACKSIGHT_INCLUDE_UPDATES') && STACKSIGHT_INCLUDE_UPDATES === true){
+        if((defined('STACKSIGHT_INCLUDE_UPDATES') && STACKSIGHT_INCLUDE_UPDATES === true) || !defined('STACKSIGHT_INCLUDE_UPDATES')){
             $checked = 'checked';
         }
         $description = '';
@@ -1080,7 +1080,7 @@ class WPStackSightPlugin {
 
     public function include_events_callback(){
         $checked = '';
-        if(defined('STACKSIGHT_INCLUDE_EVENTS') && STACKSIGHT_INCLUDE_EVENTS === true){
+        if((defined('STACKSIGHT_INCLUDE_EVENTS') && STACKSIGHT_INCLUDE_EVENTS === true) || !defined('STACKSIGHT_INCLUDE_EVENTS')){
             $checked = 'checked';
         }
         $description = '';
