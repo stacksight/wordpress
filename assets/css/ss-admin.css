@@ -63,3 +63,53 @@
     width: 40px;
     float:left;
 }
+.feature-block{
+    padding: 20px;
+    border: 1px solid #ccc;
+    margin: 10px 0;
+    clear: both;
+    overflow: hidden;
+}
+
+.feature-block .connection-info{
+    width: 100%;
+    float: left;
+    overflow: hidden;
+    border-right: 1px solid #ccc;
+}
+
+.feature-block .dump-of-data{
+    width: 100%;
+    float: left;
+    overflow: auto;
+    border-left: 1px solid #ccc;
+    margin-left: -2px;
+    background-color: #FFFFFF;
+}
+
+.feature-block .header{
+    font-weight: bold;
+}
+.debug-table{
+    border: none;
+    text-align: left;
+    margin: 10px 0 0 0;
+}
+.debug-table th, .debug-table td{
+    padding: 4px;
+}
+.debug-table tr.odd{
+    background-color: #e8e8e8;
+}
+.debug-table tr.even{
+
+}
+.feature-block .response{
+    font-size: 16px;
+    margin-top: 20px;
+    clear: both;
+    margin-bottom: 40px;
+}
+.debug-table{
+    margin-bottom: 40px;
+}

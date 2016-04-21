@@ -3,7 +3,7 @@
  * Plugin Name: Stacksight
  * Plugin URI: http://mean.io
  * Description: Stacksight wordpress support (featuring events, error logs and updates)
- * Version: 1.8.5
+ * Version: 1.9.0
  * Author: Stacksight LTD
  * Author URI: http://stacksight.io
  * License: GPL
@@ -25,6 +25,14 @@ class WPStackSightPlugin {
     private $options_features;
     private $health;
     private $dep_plugins = array();
+
+    public $defaultDefines = array(
+        'STACKSIGHT_INCLUDE_LOGS' => false,
+        'STACKSIGHT_INCLUDE_HEALTH' => true,
+        'STACKSIGHT_INCLUDE_INVENTORY' => true,
+        'STACKSIGHT_INCLUDE_EVENTS' => true,
+        'STACKSIGHT_INCLUDE_UPDATES' => true
+    );
 
     public function __construct() {
         register_activation_hook( __FILE__, array(__CLASS__, 'install'));
@@ -55,6 +63,15 @@ class WPStackSightPlugin {
         }
     }
 
+    public function showStackMessages(){
+        SSUtilities::checkPermissions();
+        if(isset($_SESSION['STACKSIGHT_MESSAGE']) && !empty($_SESSION['STACKSIGHT_MESSAGE']) && is_array($_SESSION['STACKSIGHT_MESSAGE'])){
+            foreach($_SESSION['STACKSIGHT_MESSAGE'] as $message){
+                add_settings_error('', '', $message);
+            }
+        }
+    }
+
     private function _setUpMultidomainsConfig($params = array()){
         if($params && is_array($params)){
             foreach($params as $param){
@@ -70,8 +87,8 @@ class WPStackSightPlugin {
     }
 
     public function stacksight_plugin_action_links( $links ) {
-       $links[] = '<a href="'. esc_url( get_admin_url(null, 'options-general.php?page=stacksight') ) .'">'.__('Settings').'</a>';
-       return $links;
+        $links[] = '<a href="'. esc_url( get_admin_url(null, 'options-general.php?page=stacksight') ) .'">'.__('Settings').'</a>';
+        return $links;
     }
 
     public function cron_custom_interval($schedules) {
@@ -86,11 +103,57 @@ class WPStackSightPlugin {
         return $schedules;
     }
 
+    public function handshake(){
+        $total_state = $this->getTotalState();
+        $total_hash_state = md5(serialize($total_state));
+        $old_hash_exist = false;
+        $old_hash_state = false;
+        $date_of_old_hash_state = false;
+        $state_option = false;
+
+
+        if($state_option = get_option('stacksight_state')){
+            $tempory = unserialize($state_option);
+            $old_hash_exist = true;
+            $old_hash_state = $tempory['hash_of_state'];
+            $date_of_old_hash_state = $tempory['date_of_set'];
+        }
+
+        // If we have changed state
+        if($total_hash_state != $old_hash_state){
+            $time = time();
+            // Send new state
+            $handshake_event = array(
+                'action' => ($old_hash_exist === true) ? 'updated' : 'registred',
+                'type' => 'stacksight',
+                'name' => 'configuration',
+                'data' => $total_state
+            );
+
+            // Write new state to DB
+            $new_state_to_db = array(
+                'hash_of_state' => $total_hash_state,
+                'date_of_set' => $time
+            );
+
+            if($old_hash_exist === true){
+                update_option('stacksight_state', serialize($new_state_to_db));
+            } else{
+                add_option('stacksight_state', serialize($new_state_to_db));
+            }
+
+            $this->ss_client->publishEvent($handshake_event, true);
+        }
+    }
+
     public function cron_do_main_job() {
         if(!defined('STACKSIGHT_TOKEN'))
             return;
 
         SSUtilities::error_log('cron_do_main_job has been run', 'cron_log');
+
+        $this->handshake();
+
         // updates
         if(defined('STACKSIGHT_INCLUDE_UPDATES') && STACKSIGHT_INCLUDE_UPDATES == true){
             $updates = array(
@@ -99,6 +162,8 @@ class WPStackSightPlugin {
             $this->ss_client->sendUpdates($updates, true);
         }
 
+        $health = array();
+
         if(defined('STACKSIGHT_INCLUDE_HEALTH') && STACKSIGHT_INCLUDE_HEALTH == true){
             // health, include health security class if All in One Security plugin exists
             $all_in_one_dir = WP_PLUGIN_DIR.'/all-in-one-wp-security-and-firewall';
@@ -106,43 +171,55 @@ class WPStackSightPlugin {
                 require_once($all_in_one_dir.'/wp-security-core.php');
                 require_once($all_in_one_dir.'/admin/wp-security-admin-init.php');
                 require_once('inc/wp-health-security.php');
-                // echo '<pre>'.print_r($GLOBALS['aio_wp_security'], true).'</pre>';
-                $this->health = new stdClass;
-                $this->health->security = new WPHealthSecurity();
-                $health = array();
-                $health['data'][] = $this->getSecurityData();
+
+                $active = is_plugin_active('all-in-one-wp-security-and-firewall/wp-security.php');
+                if($active === true){
+                    if(!$this->health)
+                        $this->health = new stdClass;
+
+                    $this->health->security = new WPHealthSecurity();
+                    $health['data'][] = $this->getSecurityData();
+                }
             }
 
             $seo_dir = WP_PLUGIN_DIR.'/wordpress-seo';
             if (is_file($seo_dir.'/wp-seo-main.php')) {
                 require_once('inc/wp-health-seo.php');
 
-                if(!$this->health)
-                    $this->health = new stdClass;
+                $active = is_plugin_active('wordpress-seo/wp-seo.php');
+                if($active === true){
+                    if(!$this->health)
+                        $this->health = new stdClass;
 
-                $this->health->seo = new WPHealthSeo();
-                if(!isset($health))
-                    $health = array();
+                    $this->health->seo = new WPHealthSeo();
+                    if(!isset($health))
+                        $health = array();
 
-                if($seo_data = $this->getSeoData())
-                    $health['data'][] = $seo_data;
+                    if($seo_data = $this->getSeoData())
+                        $health['data'][] = $seo_data;
+                }
             }
 
             $backups_dir = WP_PLUGIN_DIR . '/updraftplus';
             if (is_file($backups_dir . '/updraftplus.php')) {
+                if(!defined('UPDRAFTPLUS_DIR'))
+                    define('UPDRAFTPLUS_DIR', true);
                 require_once('inc/wp-health-backups.php');
                 require_once($backups_dir . '/restorer.php');
                 require_once($backups_dir . '/options.php');
 
-                if (!$this->health)
-                    $this->health = new stdClass;
+                $active = is_plugin_active('updraftplus/updraftplus.php');
+                if($active === true){
+                    if (!$this->health)
+                        $this->health = new stdClass;
 
-                $this->health->backups = new WPHealthBackups();
-                if (!isset($health))
-                    $health = array();
+                    $this->health->backups = new WPHealthBackups();
+                    if (!isset($health))
+                        $health = array();
 
-                if ($backups_data = $this->getBackupsData())
-                    $health['data'][] = $backups_data;
+                    if ($backups_data = $this->getBackupsData())
+                        $health['data'][] = $backups_data;
+                }
             }
 
             if(isset($health['data']) && !empty($health['data'])){
@@ -242,7 +319,24 @@ class WPStackSightPlugin {
                     break;
             }
 
+            $ready_show_debug = false;
+
+            if(is_admin() && (defined('STACKSIGHT_DEBUG') && STACKSIGHT_DEBUG === true)){
+                if(!strpos($_SERVER['REQUEST_URI'], 'page=stacksight&tab=debug_mode')){
+                    define('STACKSIGHT_DEBUG_MODE',true);
+                    $ready_show_debug = true;
+                }
+            }
+
             $res = $this->ss_client->publishEvent($event);
+
+            if($ready_show_debug === true){
+                if(SSUtilities::checkPermissions()){
+                    if(isset($_SESSION['stacksight_debug']['events']) && !empty($_SESSION['stacksight_debug']['events'])){
+                        SSUtilities::error_log(print_r($_SESSION['stacksight_debug']['events'], true), 'debug_events', true);
+                    }
+                }
+            }
             if (!$res['success']) SSUtilities::error_log($res['message'], 'error');
         }
     }
@@ -252,12 +346,12 @@ class WPStackSightPlugin {
      */
     public function add_plugin_page() {
         add_menu_page(
-            'StackSight Integration', 
-            'StackSight', 
-            'manage_options', 
-            'stacksight', 
+            'StackSight Integration',
+            'StackSight',
+            'manage_options',
+            'stacksight',
             array($this, 'create_admin_page'),
-            '', 
+            '',
             '80.2'
         );
     }
@@ -304,6 +398,10 @@ class WPStackSightPlugin {
      */
     public function create_admin_page() {
         $active_tab = isset( $_GET[ 'tab' ] ) ? $_GET[ 'tab' ] : 'general_settings';
+        if(is_plugin_active('aryo-activity-log/aryo-activity-log.php')){
+            define('STACKSIGHT_ACTIVE_AAL', true);
+        }
+        $this->showStackMessages();
         ?>
         <div class="ss-wrap wrap">
             <h2>App setting for StackSight</h2>
@@ -312,25 +410,32 @@ class WPStackSightPlugin {
                 <?php settings_errors(); ?>
                 <h2 class="nav-tab-wrapper">
                     <a href="?page=stacksight&tab=general_settings" class="nav-tab <?php echo $active_tab == 'general_settings' ? 'nav-tab-active' : ''; ?>">General settings</a>
-<!--                    <a href="?page=stacksight&tab=slack_integration" class="nav-tab --><?php //echo $active_tab == 'slack_integration' ? 'nav-tab-active' : ''; ?><!--">Slack integration</a>-->
                     <a href="?page=stacksight&tab=features_settings" class="nav-tab <?php echo $active_tab == 'features_settings' ? 'nav-tab-active' : ''; ?>">Features</a>
+                    <?php if(defined('STACKSIGHT_DEBUG') && STACKSIGHT_DEBUG === true):?>
+                        <a href="?page=stacksight&tab=debug_mode" class="nav-tab <?php echo $active_tab == 'debug_mode' ? 'nav-tab-active' : ''; ?>">Debug</a>
+                    <?php endif;?>
                 </h2>
                 <form method="post" action="options.php">
                     <?php
-                        if( $active_tab == 'general_settings' ) {
-                            settings_fields( 'stacksight_option_group' );
-                            do_settings_sections( 'stacksight-set-admin' );
-                            //                 show code instructions block
-                            $app_settings = get_option('stacksight_opt');
-//                            $this->showInstructions($app_settings);
-                        } else {
-                            settings_fields( 'stacksight_option_features' );
-                            do_settings_sections( 'stacksight-set-features' );
-                            //                 show code instructions block
-                            $app_settings = get_option('stacksight_opt_features');
-//                            $this->showInstructions($app_settings);
+                    if( $active_tab == 'general_settings' ) {
+                        settings_fields( 'stacksight_option_group' );
+                        do_settings_sections( 'stacksight-set-admin' );
+                        //                 show code instructions block
+                        $app_settings = get_option('stacksight_opt');
+                    } elseif($active_tab == 'features_settings') {
+                        settings_fields( 'stacksight_option_features' );
+                        do_settings_sections( 'stacksight-set-features' );
+                        //                 show code instructions block
+                        $app_settings = get_option('stacksight_opt_features');
+                    } else{
+                        if(defined('STACKSIGHT_DEBUG') && STACKSIGHT_DEBUG === true){
+                            define('STACKSIGHT_DEBUG_MODE',true);
+                            $_SESSION['stacksight_debug'] = array();
+                            $this->cron_do_main_job();
+                            $this->showDebugInfo();
                         }
-
+                    }
+                    if($active_tab != 'debug_mode')
                         submit_button();
                     ?>
                 </form>
@@ -338,6 +443,168 @@ class WPStackSightPlugin {
             </div><!-- /.wrap -->
         </div>
         <?php
+    }
+
+    private function showDebugInfo(){
+        if(isset($_SESSION['stacksight_debug']) && !empty($_SESSION['stacksight_debug']) && is_array($_SESSION['stacksight_debug'])){
+            foreach($_SESSION['stacksight_debug'] as $key => $feature):?>
+                <div class="feature-block">
+                    <h3 class="header">
+                        <?php switch($key){
+                            case 'updates':
+                                echo 'Updates';
+                                break;
+                            case 'health':
+                                echo 'Health';
+                                break;
+                            case 'inventory':
+                                echo 'Inventory';
+                                break;
+                            case 'events':
+                                echo 'Events';
+                                break;
+                            case 'logs':
+                                echo 'Logs';
+                                break;
+                        }?>
+                    </h3>
+                    <hr>
+                    <div class="connection-info">
+                        <?php foreach($feature['data'] as $key => $feature_detail):?>
+                            <div>
+                            <span>
+                                Sending type:
+                                <span class="header">
+                                    <?php switch($feature_detail['type']){
+                                        case 'curl':
+                                            echo 'cURL';
+                                            break;
+                                        case 'multicurl':
+                                            echo 'Multi cURL';
+                                            break;
+                                        case 'sockets':
+                                            echo 'Sockets';
+                                            break;
+                                        case 'threads':
+                                            echo 'Threads';
+                                            break;
+                                    };?>
+                                </span>
+                            </span>
+                            </div>
+                            <div>
+                                <?php if($feature_detail['type'] == 'curl' || $feature_detail['type'] == 'multicurl'):?>
+                                    <?php if(isset($feature['request_info']) && !empty($feature['request_info']) && is_array($feature['request_info'])):?>
+                                        <table class="debug-table" cellpadding="0" cellspacing="0">
+                                            <tbody>
+                                            <?php $i = 0; foreach($feature['request_info'] as $key_request => $request_value):?>
+                                                <?php if(in_array($key_request, SSUtilities::getCurlInfoFields())): ++$i;?>
+                                                    <tr class="<?php if(($i % 2) == 0) echo 'odd'; else echo 'even';?>">
+                                                        <th scope="row"><?php echo SSUtilities::getCurlDescription($key_request);?></th>
+                                                        <td>
+                                                            <?php
+                                                            if(is_array($request_value)){
+                                                                echo implode('<br/>', $request_value);
+                                                            } else{
+                                                                echo $request_value;
+                                                            }
+                                                            ?>
+                                                        </td>
+                                                    </tr>
+                                                <?php endif;?>
+                                            <?php endforeach;?>
+                                            </tbody>
+                                        </table>
+                                        <div class="response">
+                                            <strong>Response:</strong>
+                                            <?php echo $feature['request_info']['response']?>
+                                        </div>
+                                    <?php else:?>
+                                        <table class="debug-table" cellpadding="0" cellspacing="0">
+                                            <tbody>
+                                            <tr>
+                                                <td>Connect information not found... :(</td>
+                                            </tr>
+                                            </tbody>
+                                        </table>
+                                    <?php endif;?>
+                                <?php endif;?>
+                                <?php if($feature_detail['type'] == 'sockets'):?>
+                                    <?php if(isset($feature['request_info'][$key]) && !empty($feature['request_info'][$key]) && is_array($feature['request_info'][$key])):?>
+                                        <table class="debug-table" cellpadding="0" cellspacing="0">
+                                            <tbody>
+                                            <tr class="odd">
+                                                <th scope="row">
+                                                    Result#<?php echo $key + 1;?>:
+                                                </th>
+                                                <td>
+                                                    <?php if($feature['request_info'][$key]['error'] == true):?>
+                                                        <strong class="pre-code-red">Error</strong>
+                                                    <?php else:?>
+                                                        <strong class="pre-code-green">Success</strong>
+                                                    <?php endif;?>
+                                                </td>
+                                            </tr>
+                                            <tr class="even">
+                                                <th scope="row">
+                                                    Details:
+                                                </th>
+                                                <td><?php echo$feature['request_info'][$key]['data'];?></td>
+                                            </tr>
+                                            <tr class="odd">
+                                                <th scope="row">
+                                                    Meta:
+                                                </th>
+                                                <td><?php print_r($feature['request_info'][$key]['meta']);?></td>
+                                            </tr>
+                                            </tbody>
+                                        </table>
+                                    <?php endif;?>
+                                <?php endif;?>
+                            </div>
+                        <?php endforeach;?>
+                    </div>
+                </div>
+                <?php
+            endforeach;
+            foreach($_SESSION['stacksight_debug'] as $key => $feature_dump_data):?>
+                <div class="feature-block">
+                    <h3 class="header">
+                        <?php switch($key){
+                            case 'updates':
+                                echo 'Updates';
+                                break;
+                            case 'health':
+                                echo 'Health';
+                                break;
+                            case 'inventory':
+                                echo 'Inventory';
+                                break;
+                            case 'events':
+                                echo 'Events';
+                                break;
+                            case 'logs':
+                                echo 'Logs';
+                                break;
+                        }?>
+                    </h3>
+                    <hr>
+                    <div class="dump-of-data">
+                        <?php if(isset($feature_dump_data['data']) && !empty($feature_dump_data['data'])):?>
+                            <?php foreach($feature_dump_data['data'] as $dum_data):?>
+                                <pre>
+                                    <?php print_r($dum_data['data']);?>
+                                </pre>
+                            <?php endforeach;?>
+                        <?php else:?>
+                            <strong>Data not found... :(</strong>
+                        <?php endif;?>
+
+                    </div>
+                </div>
+                <?php
+            endforeach;
+        }
     }
 
     public function getBackupsData() {
@@ -440,11 +707,11 @@ class WPStackSightPlugin {
         if (!empty($meter)) {
             $data['widgets'][] = array(
                 'type' => 'meter',
-                'title' => __('Security Strength Meter'), 
+                'title' => __('Security Strength Meter'),
                 'desc' => __('This meter shows in points the security level of your site'), // Optional
                 'order' => 1,       // specifies the block sequence (the place in DOM). Optinal
                 'group' => 1,       // specifies the group where the widget will be rendered.
-                                    // lets sey for meter widget where will be 2 checklists but they should be display in once parent DOM container. Optinal
+                // lets sey for meter widget where will be 2 checklists but they should be display in once parent DOM container. Optinal
                 'point_max' => $meter['point_max'], // max available points to gain
                 'point_cur' => $meter['point_cur']  // current amount of the points
             );
@@ -458,7 +725,7 @@ class WPStackSightPlugin {
                 'desc' => __('Below is the current status of the critical features that you should activate on your site to achieve a minimum level of recommended security','all-in-one-wp-security-and-firewall'),
                 'order' => 2,       // specifies the block sequence (the place in DOM). Optinal
                 'group' => 1,       // specifies the group where the widget will be rendered.
-                                    // lets sey for meter widget where will be 2 checklists but they should be display in once parent DOM container. Optinal
+                // lets sey for meter widget where will be 2 checklists but they should be display in once parent DOM container. Optinal
                 'checklist' => $critical_features
             );
         }
@@ -536,7 +803,7 @@ class WPStackSightPlugin {
                     'update_link' => site_url('wp-admin/update-core.php'),
                 );
             }
-            
+
         }
 
         return $upd;
@@ -655,13 +922,16 @@ class WPStackSightPlugin {
             'setting_section_stacksight'
         );
 
-        add_settings_field(
-            '_id',
-            'App ID',
-            array( $this, 'app_id_callback' ),
-            'stacksight-set-admin',
-            'setting_section_stacksight'
-        );
+        if(defined('STACKSIGHT_APP_ID')){
+            add_settings_field(
+                '_id',
+                'App ID',
+                array( $this, 'app_id_callback' ),
+                'stacksight-set-admin',
+                'setting_section_stacksight'
+            );
+        }
+
         add_settings_field(
             'token',
             'Access Token *',
@@ -689,10 +959,10 @@ class WPStackSightPlugin {
         */
 
         add_settings_field(
-            'cron_updates_interval', 
-            'Cron updates interval', 
-            array( $this, 'cron_updates_interval_callback' ), 
-            'stacksight-set-admin', 
+            'cron_updates_interval',
+            'Cron updates interval',
+            array( $this, 'cron_updates_interval_callback' ),
+            'stacksight-set-admin',
             'setting_section_stacksight'
         );
 
@@ -774,7 +1044,7 @@ class WPStackSightPlugin {
 
     public function include_health_callback(){
         $checked = '';
-        if(defined('STACKSIGHT_INCLUDE_HEALTH') && STACKSIGHT_INCLUDE_HEALTH === true){
+        if((defined('STACKSIGHT_INCLUDE_HEALTH') && STACKSIGHT_INCLUDE_HEALTH === true) || !defined('STACKSIGHT_INCLUDE_HEALTH')){
             $checked = 'checked';
         }
         $description = '';
@@ -786,7 +1056,7 @@ class WPStackSightPlugin {
 
     public function include_inventory_callback(){
         $checked = '';
-        if(defined('STACKSIGHT_INCLUDE_INVENTORY') && STACKSIGHT_INCLUDE_INVENTORY === true) {
+        if((defined('STACKSIGHT_INCLUDE_INVENTORY') && STACKSIGHT_INCLUDE_INVENTORY === true) ||  !defined('STACKSIGHT_INCLUDE_INVENTORY')) {
             $checked = 'checked';
         }
         $description = '';
@@ -798,7 +1068,7 @@ class WPStackSightPlugin {
 
     public function include_updates_callback(){
         $checked = '';
-        if(defined('STACKSIGHT_INCLUDE_UPDATES') && STACKSIGHT_INCLUDE_UPDATES === true){
+        if((defined('STACKSIGHT_INCLUDE_UPDATES') && STACKSIGHT_INCLUDE_UPDATES === true) || !defined('STACKSIGHT_INCLUDE_UPDATES')){
             $checked = 'checked';
         }
         $description = '';
@@ -810,7 +1080,7 @@ class WPStackSightPlugin {
 
     public function include_events_callback(){
         $checked = '';
-        if(defined('STACKSIGHT_INCLUDE_EVENTS') && STACKSIGHT_INCLUDE_EVENTS === true){
+        if((defined('STACKSIGHT_INCLUDE_EVENTS') && STACKSIGHT_INCLUDE_EVENTS === true) || !defined('STACKSIGHT_INCLUDE_EVENTS')){
             $checked = 'checked';
         }
         $description = '';
@@ -866,7 +1136,7 @@ class WPStackSightPlugin {
                 );
             } else {
                 printf(
-                    '<span>'.STACKSIGHT_TOKEN.'</span>'
+                    '<span>'.STACKSIGHT_TOKEN.'</span><input type="hidden" name="stacksight_opt[token]" value="'.STACKSIGHT_TOKEN.'">'
                 );
             }
         }
@@ -980,7 +1250,7 @@ class WPStackSightPlugin {
     }
 
     public static function install() {
-        
+
     }
 
     public static function uninstall() {
@@ -1003,7 +1273,7 @@ class WPStackSightPlugin {
             $list[] = __('Token doesn\'t exist', 'stacksight').'<br>';
             $show_code = true;
         }
-    
+
         if ((!defined('STACKSIGHT_PHP_SDK_INCLUDE') || (defined('STACKSIGHT_PHP_SDK_INCLUDE') && STACKSIGHT_PHP_SDK_INCLUDE !== true))) {
             $list[] = __('wp-config.php is not configured as specified below', 'stacksight').'<br>';
             $show_code = true;
@@ -1012,51 +1282,33 @@ class WPStackSightPlugin {
         foreach ($this->dep_plugins as $plugin => $d_plg) {
             if (!is_plugin_active($plugin)) {
                 $list[] = SSUtilities::t('Plugin <a target="_blank" href="{link}">{plugin}</a> is required, please install and activate', array(
-                    '{link}' => $d_plg['link'], 
-                    '{plugin}' => $d_plg['name']
-                )).'<br>';
+                        '{link}' => $d_plg['link'],
+                        '{plugin}' => $d_plg['name']
+                    )).'<br>';
             }
         }
 
         return array('list' => array_reverse($list), 'show_code' => $show_code);
     }
 
-public function showInstructions($app) {
-    $diagnostic = $this->getDiagnostic($app);
-    $app_token = defined('STACKSIGHT_TOKEN') ? STACKSIGHT_TOKEN : 'YOUR_STACKSIGHT_TOKEN';
-?>
-    <div class="ss-diagnostic-block">
-        <h3><?php echo __('Configuration status', 'stacksight') ?></h3>
-        <ul class="ss-config-diagnostic <?php echo (($diagnostic['list']))? 'error' : 'success'?>">
-            <?php if ($diagnostic['list']): ?>
-                <?php foreach ($diagnostic['list'] as $d_item): ?>
-                    <li><?php echo $d_item ?></li>
-                <?php endforeach ?>
-            <?php else: ?>
-                <h4 class="ss-ok">OK</h4>
-            <?php endif ?>
-        </ul>
-    </div>
-    <?php if ((!defined('STACKSIGHT_PHP_SDK_INCLUDE') || (defined('STACKSIGHT_PHP_SDK_INCLUDE') && STACKSIGHT_PHP_SDK_INCLUDE !== true)) && $diagnostic['show_code']): ?>
-    <div class="ss-config-block">
-        <p><?php echo __("Insert that code (start - end) at the bottom of your wp-config.php but before a line <strong>".htmlspecialchars('require_once(ABSPATH . \'wp-settings.php\');')." </strong>") ?></p>
-        <div class="class-code">
-            <div class="code-comments">// StackSight start config</div>
-            <div class="">
-                <div>$ss_inc<span class=""> = </span><span class="">dirname(__FILE__)</span><span class=""> . </span><span class="">'/<?php echo $this->getRelativeRootPath(); ?>stacksight-php-sdk/bootstrap-wp.php'</span>;</div>
-                <div><span class="">if</span>(<span class="">is_file</span>($ss_inc)) {</div>
-                <div class="tab">
-                    <div><span class="">require_once</span>($ss_inc);</div>
-                </div>
-                }
-            </div>
-            <div class="code-comments">// StackSight end config</div>
-        </div>
-        <div class="screen-of-config">
-            <img src="<?php echo plugins_url('assets/img/config-screen.png', __FILE__ )?>" alt="Screen of config"/>
-        </div>
-    </div>
-<?php endif;
+    public function getTotalState(){
+        $plugin_info = get_plugin_data(dirname(__FILE__).'/wp-stacksight.php');
+        return array(
+            'app' => $plugin_info,
+            'settings' => array(
+                'app_id' => (defined('STACKSIGHT_APP_ID')) ? STACKSIGHT_APP_ID : false,
+                'app_token' => (defined('STACKSIGHT_TOKEN')) ? STACKSIGHT_TOKEN : false,
+                'app_group' => (defined('STACKSIGHT_GROUP')) ? STACKSIGHT_GROUP : false,
+                'debug_mode' => (defined('STACKSIGHT_DEBUG')) ? STACKSIGHT_DEBUG : false
+            ),
+            'features' => array(
+                'logs' => (defined('STACKSIGHT_INCLUDE_LOGS')) ? STACKSIGHT_INCLUDE_LOGS : $this->defaultDefines['STACKSIGHT_INCLUDE_LOGS'],
+                'health' => (defined('STACKSIGHT_INCLUDE_HEALTH')) ? STACKSIGHT_INCLUDE_HEALTH : $this->defaultDefines['STACKSIGHT_INCLUDE_HEALTH'],
+                'inventory' => (defined('STACKSIGHT_INCLUDE_INVENTORY')) ? STACKSIGHT_INCLUDE_INVENTORY : $this->defaultDefines['STACKSIGHT_INCLUDE_INVENTORY'],
+                'events' => (defined('STACKSIGHT_INCLUDE_EVENTS')) ? STACKSIGHT_INCLUDE_EVENTS : $this->defaultDefines['STACKSIGHT_INCLUDE_EVENTS'],
+                'updates' => (defined('STACKSIGHT_INCLUDE_UPDATES')) ? STACKSIGHT_INCLUDE_UPDATES : $this->defaultDefines['STACKSIGHT_INCLUDE_UPDATES']
+            )
+        );
     }
 
 }
