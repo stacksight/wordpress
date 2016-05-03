@@ -147,7 +147,7 @@ class WPStackSightPlugin {
     }
 
     public function cron_do_main_job() {
-        if(!defined('STACKSIGHT_TOKEN'))
+        if(!defined('STACKSIGHT_TOKEN') || !isset($this->ss_client) || !$this->ss_client)
             return;
 
         SSUtilities::error_log('cron_do_main_job has been run', 'cron_log');
@@ -1292,7 +1292,27 @@ class WPStackSightPlugin {
     }
 
     public function getTotalState(){
+        global $wpdb;
+
         $plugin_info = get_plugin_data(dirname(__FILE__).'/wp-stacksight.php');
+        $plugin_info['free_space'] = shell_exec('du -hs .');
+
+
+        $table = _get_meta_table('user');
+        $meta = $wpdb->get_row("SELECT * FROM $table WHERE meta_key = 'last_login_time' ORDER BY 'meta_value' DESC LIMIT 1 ");
+        if (isset($meta->meta_value)){
+            $meta->meta_value = maybe_unserialize( $meta->meta_value );
+            if(isset($meta->user_id)){
+                $user_info = get_userdata($meta->user_id);
+                $plugin_info['last_login'] = array(
+                    'user_id' => $meta->user_id,
+                    'user_login' => $user_info->user_login,
+                    'user_mail' => $user_info->user_email,
+                    'user_name' => $user_info->display_name
+                );
+            }
+        }
+
         return array(
             'app' => $plugin_info,
             'settings' => array(
