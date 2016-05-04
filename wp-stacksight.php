@@ -3,7 +3,7 @@
  * Plugin Name: Stacksight
  * Plugin URI: http://mean.io
  * Description: Stacksight wordpress support (featuring events, error logs and updates)
- * Version: 1.9.0
+ * Version: 1.9.1
  * Author: Stacksight LTD
  * Author URI: http://stacksight.io
  * License: GPL
@@ -11,7 +11,6 @@
 
 defined('ABSPATH') or die("No script kiddies please!");
 
-require_once('texts.php');
 require_once('stacksight-php-sdk/SSUtilities.php');
 require_once('stacksight-php-sdk/SSClientBase.php');
 require_once('stacksight-php-sdk/SSHttpRequest.php');
@@ -56,8 +55,11 @@ class WPStackSightPlugin {
             if (function_exists('register_nav_menus')){
 
             }
-            if((defined('STACKSIGHT_DEPENDENCY_AAL') && STACKSIGHT_DEPENDENCY_AAL === true) && function_exists('aal_insert_log')) {
-                add_action('aal_insert_log', array(&$this, 'insert_log_mean'), 30);
+            if(defined('STACKSIGHT_DEPENDENCY_AAL') && STACKSIGHT_DEPENDENCY_AAL === true){
+                require_once(ABSPATH .'wp-content/plugins/aryo-activity-log/aryo-activity-log.php');
+                if(function_exists('aal_insert_log')) {
+                    add_action('aal_insert_log', array(&$this, 'insert_log_mean'), 30);
+                }
             }
             add_action('stacksight_main_action', array($this, 'cron_do_main_job'));
         }
@@ -147,7 +149,7 @@ class WPStackSightPlugin {
     }
 
     public function cron_do_main_job() {
-        if(!defined('STACKSIGHT_TOKEN'))
+        if(!defined('STACKSIGHT_TOKEN') || !isset($this->ss_client) || !$this->ss_client)
             return;
 
         SSUtilities::error_log('cron_do_main_job has been run', 'cron_log');
@@ -398,9 +400,14 @@ class WPStackSightPlugin {
      */
     public function create_admin_page() {
         $active_tab = isset( $_GET[ 'tab' ] ) ? $_GET[ 'tab' ] : 'general_settings';
-        if(is_plugin_active('aryo-activity-log/aryo-activity-log.php')){
-            define('STACKSIGHT_ACTIVE_AAL', true);
+        if(file_exists(ABSPATH .'wp-content/plugins/aryo-activity-log/aryo-activity-log.php')){
+            if(is_plugin_active('aryo-activity-log/aryo-activity-log.php')){
+                define('STACKSIGHT_ACTIVE_AAL', true);
+            } else{
+                define('STACKSIGHT_ACTIVE_AAL', false);
+            }
         }
+        require_once('texts.php');
         $this->showStackMessages();
         ?>
         <div class="ss-wrap wrap">
@@ -1087,7 +1094,8 @@ class WPStackSightPlugin {
         if(defined('stacksight_events_text')){
             $description = stacksight_events_text;
         }
-        if((defined('STACKSIGHT_DEPENDENCY_AAL') && STACKSIGHT_DEPENDENCY_AAL === true) && function_exists('aal_insert_log')){
+
+        if((defined('STACKSIGHT_DEPENDENCY_AAL') && STACKSIGHT_DEPENDENCY_AAL === true) && function_exists('aal_insert_log') && (defined('STACKSIGHT_ACTIVE_AAL') && STACKSIGHT_ACTIVE_AAL === true)){
             printf('<div class="health_features_option"><div class="checkbox"><input type="checkbox" name="stacksight_opt_features[include_events]" id="enable_features_events" '.$checked.' /></div>'.$description.'</div>');
         } else{
             printf('<div class="health_features_option"><div class="checkbox"><input type="checkbox" name="stacksight_opt_features[include_events]" id="enable_features_events" disabled/></div>'.$description.'</div>');
@@ -1292,7 +1300,31 @@ class WPStackSightPlugin {
     }
 
     public function getTotalState(){
+        global $wpdb;
+
         $plugin_info = get_plugin_data(dirname(__FILE__).'/wp-stacksight.php');
+        $plugin_info['free_space'] = trim(str_replace('	.','', shell_exec('du -hs .')));
+
+
+        $table = _get_meta_table('user');
+        $meta = $wpdb->get_row("SELECT * FROM $table WHERE meta_key = 'last_login_time' ORDER BY 'meta_value' DESC LIMIT 1 ");
+        if (isset($meta->meta_value)){
+            $meta->meta_value = maybe_unserialize( $meta->meta_value );
+            if(isset($meta->user_id)){
+                $user_info = get_userdata($meta->user_id);
+                $plugin_info['last_login'] = array(
+                    'user_id' => $meta->user_id,
+                    'user_login' => $user_info->user_login,
+                    'user_mail' => $user_info->user_email,
+                    'user_name' => $user_info->display_name,
+                    'time' => $meta->meta_value
+                );
+            }
+        }
+
+        $plugin_info['public'] = get_option('blog_public');
+        $plugin_info['url'] = get_home_url();
+
         return array(
             'app' => $plugin_info,
             'settings' => array(
