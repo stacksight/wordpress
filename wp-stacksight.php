@@ -1298,7 +1298,7 @@ class WPStackSightPlugin {
         global $wpdb;
 
         $plugin_info = get_plugin_data(dirname(__FILE__).'/wp-stacksight.php');
-        $plugin_info['free_space'] = shell_exec('du -hs .');
+        $plugin_info['free_space'] = trim(str_replace('	.','', shell_exec('du -hs .')));
 
 
         $table = _get_meta_table('user');
@@ -1311,10 +1311,14 @@ class WPStackSightPlugin {
                     'user_id' => $meta->user_id,
                     'user_login' => $user_info->user_login,
                     'user_mail' => $user_info->user_email,
-                    'user_name' => $user_info->display_name
+                    'user_name' => $user_info->display_name,
+                    'time' => $meta->meta_value
                 );
             }
         }
+
+        $plugin_info['public'] = get_option('blog_public');
+        $plugin_info['url'] = get_home_url();
 
         return array(
             'app' => $plugin_info,
