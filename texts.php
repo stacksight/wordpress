@@ -22,12 +22,24 @@ define('stacksight_inventory_text', $inventory_text);
 
 
 define('stacksight_events_title', 'Include Events');
-$events_text = !((defined('STACKSIGHT_DEPENDENCY_AAL') && STACKSIGHT_DEPENDENCY_AAL === true) && (defined('STACKSIGHT_ACTIVE_AAL') && STACKSIGHT_ACTIVE_AAL === true)) ? <<<HTML
+
+print_r(STACKSIGHT_DEPENDENCY_AAL);
+print_r(STACKSIGHT_ACTIVE_AAL);
+var_dump((defined('STACKSIGHT_DEPENDENCY_AAL') && STACKSIGHT_DEPENDENCY_AAL === true) && (defined('STACKSIGHT_ACTIVE_AAL') && STACKSIGHT_ACTIVE_AAL === true));
+
+if((defined('STACKSIGHT_DEPENDENCY_AAL') && STACKSIGHT_DEPENDENCY_AAL === true) && (defined('STACKSIGHT_ACTIVE_AAL') && STACKSIGHT_ACTIVE_AAL === true)){
+    $events_text =  <<<HTML
     <div>Watch users and application events at real time</div>
-HTML
-    : <<<HTML
+HTML;
+} elseif(defined('STACKSIGHT_ACTIVE_AAL') && STACKSIGHT_ACTIVE_AAL === false){
+    $events_text = <<<HTML
+            <div class="code-red">If you want events enable, please activate <strong>Activity Log plugin</strong>.</div>
+HTML;
+} else{
+    $events_text = <<<HTML
     <div class="code-red">If you want events enable, please install and activate <a href="https://wordpress.org/plugins/aryo-activity-log/" target="_blank">Activity Log plugin</a>.</div>
 HTML;
+}
 
 define('stacksight_events_text', $events_text);
 

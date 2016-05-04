@@ -11,7 +11,6 @@
 
 defined('ABSPATH') or die("No script kiddies please!");
 
-require_once('texts.php');
 require_once('stacksight-php-sdk/SSUtilities.php');
 require_once('stacksight-php-sdk/SSClientBase.php');
 require_once('stacksight-php-sdk/SSHttpRequest.php');
@@ -401,9 +400,14 @@ class WPStackSightPlugin {
      */
     public function create_admin_page() {
         $active_tab = isset( $_GET[ 'tab' ] ) ? $_GET[ 'tab' ] : 'general_settings';
-        if(is_plugin_active('aryo-activity-log/aryo-activity-log.php')){
-            define('STACKSIGHT_ACTIVE_AAL', true);
+        if(file_exists(ABSPATH .'wp-content/plugins/aryo-activity-log/aryo-activity-log.php')){
+            if(is_plugin_active('aryo-activity-log/aryo-activity-log.php')){
+                define('STACKSIGHT_ACTIVE_AAL', true);
+            } else{
+                define('STACKSIGHT_ACTIVE_AAL', false);
+            }
         }
+        require_once('texts.php');
         $this->showStackMessages();
         ?>
         <div class="ss-wrap wrap">
@@ -1090,7 +1094,8 @@ class WPStackSightPlugin {
         if(defined('stacksight_events_text')){
             $description = stacksight_events_text;
         }
-        if((defined('STACKSIGHT_DEPENDENCY_AAL') && STACKSIGHT_DEPENDENCY_AAL === true) && function_exists('aal_insert_log')){
+
+        if((defined('STACKSIGHT_DEPENDENCY_AAL') && STACKSIGHT_DEPENDENCY_AAL === true) && function_exists('aal_insert_log') && (defined('STACKSIGHT_ACTIVE_AAL') && STACKSIGHT_ACTIVE_AAL === true)){
             printf('<div class="health_features_option"><div class="checkbox"><input type="checkbox" name="stacksight_opt_features[include_events]" id="enable_features_events" '.$checked.' /></div>'.$description.'</div>');
         } else{
             printf('<div class="health_features_option"><div class="checkbox"><input type="checkbox" name="stacksight_opt_features[include_events]" id="enable_features_events" disabled/></div>'.$description.'</div>');
