@@ -56,8 +56,11 @@ class WPStackSightPlugin {
             if (function_exists('register_nav_menus')){
 
             }
-            if((defined('STACKSIGHT_DEPENDENCY_AAL') && STACKSIGHT_DEPENDENCY_AAL === true) && function_exists('aal_insert_log')) {
-                add_action('aal_insert_log', array(&$this, 'insert_log_mean'), 30);
+            if(defined('STACKSIGHT_DEPENDENCY_AAL') && STACKSIGHT_DEPENDENCY_AAL === true){
+                require_once(ABSPATH .'wp-content/plugins/aryo-activity-log/aryo-activity-log.php');
+                if(function_exists('aal_insert_log')) {
+                    add_action('aal_insert_log', array(&$this, 'insert_log_mean'), 30);
+                }
             }
             add_action('stacksight_main_action', array($this, 'cron_do_main_job'));
         }
