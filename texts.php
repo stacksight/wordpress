@@ -20,13 +20,7 @@ $inventory_text = <<<HTML
 HTML;
 define('stacksight_inventory_text', $inventory_text);
 
-
 define('stacksight_events_title', 'Include Events');
-
-print_r(STACKSIGHT_DEPENDENCY_AAL);
-print_r(STACKSIGHT_ACTIVE_AAL);
-var_dump((defined('STACKSIGHT_DEPENDENCY_AAL') && STACKSIGHT_DEPENDENCY_AAL === true) && (defined('STACKSIGHT_ACTIVE_AAL') && STACKSIGHT_ACTIVE_AAL === true));
-
 if((defined('STACKSIGHT_DEPENDENCY_AAL') && STACKSIGHT_DEPENDENCY_AAL === true) && (defined('STACKSIGHT_ACTIVE_AAL') && STACKSIGHT_ACTIVE_AAL === true)){
     $events_text =  <<<HTML
     <div>Watch users and application events at real time</div>
