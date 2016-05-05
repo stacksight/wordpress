@@ -1303,11 +1303,10 @@ class WPStackSightPlugin {
         global $wpdb;
 
         $plugin_info = get_plugin_data(dirname(__FILE__).'/wp-stacksight.php');
-        $plugin_info['free_space'] = trim(str_replace('	.','', shell_exec('du -hs .')));
-
-
+        $plugin_info['space_used'] = trim(str_replace('	.','', shell_exec('du -hs .')));
+        $plugin_info['wpml_lang'] = false;
         $table = _get_meta_table('user');
-        $meta = $wpdb->get_row("SELECT * FROM $table WHERE meta_key = 'last_login_time' ORDER BY 'meta_value' DESC LIMIT 1 ");
+        $meta = $wpdb->get_row("SELECT * FROM $table WHERE meta_key = 'last_login_time' ORDER BY 'meta_value' DESC LIMIT 1");
         if (isset($meta->meta_value)){
             $meta->meta_value = maybe_unserialize( $meta->meta_value );
             if(isset($meta->user_id)){
@@ -1317,7 +1316,7 @@ class WPStackSightPlugin {
                     'user_login' => $user_info->user_login,
                     'user_mail' => $user_info->user_email,
                     'user_name' => $user_info->display_name,
-                    'time' => $meta->meta_value
+                    'time' => strtotime($meta->meta_value)
                 );
             }
         }
