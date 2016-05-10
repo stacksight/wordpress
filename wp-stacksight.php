@@ -1,9 +1,9 @@
 <?php
 /**
  * Plugin Name: Stacksight
- * Plugin URI: http://mean.io
+ * Plugin URI: https://wordpress.org/plugins/stacksight/
  * Description: Stacksight wordpress support (featuring events, error logs and updates)
- * Version: 1.9.2
+ * Version: 1.9.3
  * Author: Stacksight LTD
  * Author URI: http://stacksight.io
  * License: GPL
@@ -41,7 +41,6 @@ class WPStackSightPlugin {
             add_action('admin_menu', array($this, 'add_plugin_page'));
             add_action('admin_init', array($this, 'page_init'));
             add_action('admin_notices', array($this, 'show_errors'));
-            wp_enqueue_style('ss-admin', plugins_url('assets/css/ss-admin.css', __FILE__ ));
             add_filter( 'plugin_action_links_' . plugin_basename(__FILE__), array($this, 'stacksight_plugin_action_links'));
         }
 
@@ -399,6 +398,7 @@ class WPStackSightPlugin {
      * Options page callback
      */
     public function create_admin_page() {
+        wp_enqueue_style('ss-admin', plugins_url('assets/css/ss-admin.css', __FILE__ ));
         $active_tab = isset( $_GET[ 'tab' ] ) ? $_GET[ 'tab' ] : 'general_settings';
         if(file_exists(ABSPATH .'wp-content/plugins/aryo-activity-log/aryo-activity-log.php')){
             if(is_plugin_active('aryo-activity-log/aryo-activity-log.php')){
