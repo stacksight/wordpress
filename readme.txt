@@ -3,7 +3,7 @@ Contributors: liorkesos, bora-89, igor-lemon
 Tags: administration, activity, event, monitor, multisite, multi-users, log, logger, audit log, stats, security, tracking, woocommerce, notifications, email notifications
 Requires at least: 3.5
 Tested up to: 4.3
-Stable tag: 1.9.2
+Stable tag: 1.9.3
 License: GPLv2 or later
 
 
@@ -65,6 +65,10 @@ stacksight contributions can be done through submiting PRS to the [Github repo](
 
 
 == Changelog ==
+
+= 1.9.3 =
+- Added MySQLi support
+- Fixed RTL issue
 
 = 1.12 =
 * Move to updates index
