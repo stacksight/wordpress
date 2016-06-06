@@ -1304,7 +1304,7 @@ class WPStackSightPlugin {
         global $wpdb;
 
         $plugin_info = get_plugin_data(dirname(__FILE__).'/wp-stacksight.php');
-        $plugin_info['space_used'] = ((function_exists('exec'))) ? trim(str_replace('	.','', shell_exec('du -hs ./'))) : 'n/a';
+        $plugin_info['space_used'] = ((function_exists('exec'))) ? trim(str_replace('	.','', shell_exec('du -hs .'))) : 'n/a';
         $plugin_info['wpml_lang'] = false;
         $table = _get_meta_table('user');
         $meta = $wpdb->get_row("SELECT * FROM $table WHERE meta_key = 'last_login_time' ORDER BY 'meta_value' DESC LIMIT 1");
