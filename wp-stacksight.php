@@ -377,6 +377,7 @@ class WPStackSightPlugin {
             }
         }
 
+        $current_theme = get_current_theme();
         if($object_themes && is_array($object_themes)){
             foreach($object_themes as $theme_name => $theme){
                 $themes[] = array(
@@ -386,11 +387,11 @@ class WPStackSightPlugin {
                     'label' => $theme->get('Name'),
                     'description' => $theme->get('Description'),
                     'active' => ($theme->get('Status') == 'publish') ? true : false,
+                    'current' => ($theme_name == $current_theme) ? true: false,
                     'requires' => array()
                 );
             }
         }
-
         return array_merge($themes, $plugins);
     }
 
