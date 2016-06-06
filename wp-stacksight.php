@@ -1316,6 +1316,7 @@ class WPStackSightPlugin {
                     'user_login' => $user_info->user_login,
                     'user_mail' => $user_info->user_email,
                     'user_name' => $user_info->display_name,
+                    'user_link' => get_edit_user_link($meta->user_id),
                     'time' => strtotime($meta->meta_value)
                 );
             }
