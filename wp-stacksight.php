@@ -1304,7 +1304,25 @@ class WPStackSightPlugin {
         global $wpdb;
 
         $plugin_info = get_plugin_data(dirname(__FILE__).'/wp-stacksight.php');
-        $plugin_info['space_used'] = ((function_exists('exec'))) ? trim(str_replace('	.','', shell_exec('du -hs .'))) : 'n/a';
+        if(function_exists('exec')){
+            if (is_multisite()) {
+                $blog_id = (int) get_current_blog_id();
+                $full_size = (int) trim(str_replace('	.','', shell_exec('du -sk '.get_home_path())));
+                $upload_full_size = (int) trim(str_replace('	.','', shell_exec('du -sk '.get_home_path().'wp-content/uploads')));
+                if($blog_id == 1){
+                    $blogs_size =  (int) trim(str_replace('	.','', shell_exec('du -sk '.get_home_path().'wp-content/uploads/sites')));
+                    $blog_size =  $upload_full_size - $blogs_size;
+                } else{
+                    $blog_size =  (int) trim(str_replace('	.','', shell_exec('du -sk '.get_home_path().'wp-content/uploads/sites/'.$blog_id)));
+                }
+                $total_size = $full_size - $upload_full_size + $blog_size;
+                $plugin_info['space_used'] = $total_size;
+            } else{
+                $plugin_info['space_used'] = (int) trim(str_replace('	.','', shell_exec('du -sk .')));
+            }
+        } else{
+            $plugin_info['space_used'] = 'n/a';
+        }
         $plugin_info['wpml_lang'] = false;
 
         $login_activity_table = $wpdb->prefix.'aiowps_login_activity';
