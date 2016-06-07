@@ -1306,19 +1306,36 @@ class WPStackSightPlugin {
         $plugin_info = get_plugin_data(dirname(__FILE__).'/wp-stacksight.php');
         $plugin_info['space_used'] = ((function_exists('exec'))) ? trim(str_replace('	.','', shell_exec('du -hs .'))) : 'n/a';
         $plugin_info['wpml_lang'] = false;
+
+        $login_activity_table = $wpdb->prefix.'aiowps_login_activity';
+        $data = $wpdb->get_results($wpdb->prepare("SELECT * FROM $login_activity_table ORDER BY login_date DESC LIMIT %d", 1), ARRAY_A);
+        $login_date = false;
         $table = _get_meta_table('user');
-        $meta = $wpdb->get_row("SELECT * FROM $table WHERE meta_key = 'last_login_time' ORDER BY 'meta_value' DESC LIMIT 1");
+
+        if (!empty($data) && isset($data[0]['user_id'])) {
+            $sql = "SELECT * FROM $table WHERE meta_key = 'last_login_time' AND user_id = ".$data[0]['user_id']." ORDER BY 'meta_value' DESC LIMIT 1";
+            $login_date = $data[0]['login_date'];
+        } else{
+            $sql = "SELECT * FROM $table WHERE meta_key = 'last_login_time' ORDER BY 'meta_value' DESC LIMIT 1";
+        }
+
+        $meta = $wpdb->get_row($sql);
         if (isset($meta->meta_value)){
             $meta->meta_value = maybe_unserialize( $meta->meta_value );
             if(isset($meta->user_id)){
                 $user_info = get_userdata($meta->user_id);
+                if($login_date === false){
+                    $login_time = strtotime($meta->meta_value);
+                } else{
+                    $login_time = strtotime($login_date);
+                }
                 $plugin_info['last_login'] = array(
                     'user_id' => $meta->user_id,
                     'user_login' => $user_info->user_login,
                     'user_mail' => $user_info->user_email,
                     'user_name' => $user_info->display_name,
                     'user_link' => get_edit_user_link($meta->user_id),
-                    'time' => strtotime($meta->meta_value)
+                    'time' => $login_time
                 );
             }
         }
