@@ -1307,24 +1307,39 @@ class WPStackSightPlugin {
         if(function_exists('exec')){
             if (is_multisite()) {
                 $blog_id = (int) get_current_blog_id();
+                $is_old = false;
+                if(is_dir(get_home_path().'wp-content/blogs.dir') && $blog_id != 1){
+                    $basic_path = 'wp-content/blogs.dir';
+                    $is_old = true;
+                } else{
+                    $basic_path = 'wp-content/uploads';
+                }
+
                 $full_size = (int) trim(str_replace('	.','', shell_exec('du -sk '.get_home_path())));
-                $upload_full_size = (int) trim(str_replace('	.','', shell_exec('du -sk '.get_home_path().'wp-content/uploads')));
+                $upload_full_size = (int) trim(str_replace('	.','', shell_exec('du -sk '.get_home_path(). $basic_path)));
                 if($blog_id == 1){
-                    $blogs_size =  (int) trim(str_replace('	.','', shell_exec('du -sk '.get_home_path().'wp-content/uploads/sites')));
+                    $blogs_size =  (int) trim(str_replace('	.','', shell_exec('du -sk '.get_home_path(). $basic_path.'/sites')));
                     $blog_size =  $upload_full_size - $blogs_size;
                 } else{
-                    $blog_size =  (int) trim(str_replace('	.','', shell_exec('du -sk '.get_home_path().'wp-content/uploads/sites/'.$blog_id)));
+                    if($is_old){
+                        $blog_size =  (int) trim(str_replace('	.','', shell_exec('du -sk '.get_home_path(). $basic_path.'/'.$blog_id)));
+
+                    } else{
+                        $blog_size =  (int) trim(str_replace('	.','', shell_exec('du -sk '.get_home_path(). $basic_path.'/sites/'.$blog_id)));
+                    }
                 }
+
                 $total_size = $full_size - $upload_full_size + $blog_size;
                 $plugin_info['space_used'] = $total_size;
+
             } else{
                 $plugin_info['space_used'] = (int) trim(str_replace('	.','', shell_exec('du -sk .')));
             }
         } else{
             $plugin_info['space_used'] = 'n/a';
         }
-        $plugin_info['wpml_lang'] = false;
 
+        $plugin_info['wpml_lang'] = false;
         $login_activity_table = $wpdb->prefix.'aiowps_login_activity';
         $data = $wpdb->get_results($wpdb->prepare("SELECT * FROM $login_activity_table ORDER BY login_date DESC LIMIT %d", 1), ARRAY_A);
         $login_date = false;
