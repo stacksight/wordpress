@@ -1331,10 +1331,10 @@ class WPStackSightPlugin {
         $table = _get_meta_table('user');
 
         if (!empty($data) && isset($data[0]['user_id'])) {
-            $sql = "SELECT * FROM $table WHERE meta_key = 'last_login_time' AND user_id = ".$data[0]['user_id']." ORDER BY 'meta_value' DESC LIMIT 1";
+            $sql = "SELECT * FROM $table WHERE meta_key = 'last_login_time' AND user_id = ".$data[0]['user_id']." ORDER BY meta_value DESC LIMIT 1";
             $login_date = $data[0]['login_date'];
         } else{
-            $sql = "SELECT * FROM $table WHERE meta_key = 'last_login_time' ORDER BY 'meta_value' DESC LIMIT 1";
+            $sql = "SELECT * FROM $table WHERE meta_key = 'last_login_time' ORDER BY meta_value DESC LIMIT 1";
         }
 
         $meta = $wpdb->get_row($sql);
