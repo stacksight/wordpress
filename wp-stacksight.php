@@ -1358,6 +1358,18 @@ class WPStackSightPlugin {
             }
         }
 
+        $owner_mail = get_option('admin_email');
+        $user_owner = get_user_by_email($owner_mail);
+        if($user_owner){
+            $plugin_info['owner'] = array(
+                'user_id' => $user_owner->get('id'),
+                'user_login' => $user_owner->get('user_login'),
+                'user_mail' => $user_owner->get('user_email'),
+                'user_name' => $user_owner->get('display_name'),
+                'user_link' => get_edit_user_link($user_owner->get('id')),
+            );
+        }
+
         $plugin_info['public'] = get_option('blog_public');
         $plugin_info['url'] = get_home_url();
 
