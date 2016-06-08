@@ -1306,11 +1306,16 @@ class WPStackSightPlugin {
         $plugin_info = get_plugin_data(dirname(__FILE__).'/wp-stacksight.php');
         if(function_exists('exec')){
             if (is_multisite()) {
+                $wp_version = get_bloginfo('version');
                 $blog_id = (int) get_current_blog_id();
                 $is_old = false;
-                if(is_dir(get_home_path().'wp-content/blogs.dir') && $blog_id != 1){
-                    $basic_path = 'wp-content/blogs.dir';
+
+                if(is_dir(get_home_path().'wp-content/blogs.dir')){
                     $is_old = true;
+                }
+                
+                if($is_old){
+                    $basic_path = 'wp-content/blogs.dir';
                 } else{
                     $basic_path = 'wp-content/uploads';
                 }
@@ -1318,20 +1323,21 @@ class WPStackSightPlugin {
                 $full_size = (int) trim(str_replace('	.','', shell_exec('du -sk '.get_home_path())));
                 $upload_full_size = (int) trim(str_replace('	.','', shell_exec('du -sk '.get_home_path(). $basic_path)));
                 if($blog_id == 1){
-                    $blogs_size =  (int) trim(str_replace('	.','', shell_exec('du -sk '.get_home_path(). $basic_path.'/sites')));
+                    if($is_old){
+                        $blogs_size =  (int) trim(str_replace('	.','', shell_exec('du -sk '.get_home_path(). $basic_path)));
+                    } else{
+                        $blogs_size =  (int) trim(str_replace('	.','', shell_exec('du -sk '.get_home_path(). $basic_path.'/sites')));
+                    }
                     $blog_size =  $upload_full_size - $blogs_size;
                 } else{
                     if($is_old){
                         $blog_size =  (int) trim(str_replace('	.','', shell_exec('du -sk '.get_home_path(). $basic_path.'/'.$blog_id)));
-
                     } else{
                         $blog_size =  (int) trim(str_replace('	.','', shell_exec('du -sk '.get_home_path(). $basic_path.'/sites/'.$blog_id)));
                     }
                 }
-
                 $total_size = $full_size - $upload_full_size + $blog_size;
                 $plugin_info['space_used'] = $total_size;
-
             } else{
                 $plugin_info['space_used'] = (int) trim(str_replace('	.','', shell_exec('du -sk .')));
             }
