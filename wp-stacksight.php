@@ -1313,7 +1313,7 @@ class WPStackSightPlugin {
                 if(is_dir(get_home_path().'wp-content/blogs.dir')){
                     $is_old = true;
                 }
-                
+
                 if($is_old){
                     $basic_path = 'wp-content/blogs.dir';
                 } else{
