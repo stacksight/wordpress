@@ -3,7 +3,7 @@
  * Plugin Name: Stacksight
  * Plugin URI: https://wordpress.org/plugins/stacksight/
  * Description: Stacksight wordpress support (featuring events, error logs and updates)
- * Version: 1.9.3
+ * Version: 1.9.4
  * Author: Stacksight LTD
  * Author URI: http://stacksight.io
  * License: GPL
@@ -377,6 +377,7 @@ class WPStackSightPlugin {
             }
         }
 
+        $current_theme = get_current_theme();
         if($object_themes && is_array($object_themes)){
             foreach($object_themes as $theme_name => $theme){
                 $themes[] = array(
@@ -386,11 +387,11 @@ class WPStackSightPlugin {
                     'label' => $theme->get('Name'),
                     'description' => $theme->get('Description'),
                     'active' => ($theme->get('Status') == 'publish') ? true : false,
+                    'current' => ($theme_name == $current_theme) ? true: false,
                     'requires' => array()
                 );
             }
         }
-
         return array_merge($themes, $plugins);
     }
 
@@ -1303,22 +1304,91 @@ class WPStackSightPlugin {
         global $wpdb;
 
         $plugin_info = get_plugin_data(dirname(__FILE__).'/wp-stacksight.php');
-        $plugin_info['space_used'] = trim(str_replace('	.','', shell_exec('du -hs .')));
+        if(function_exists('exec')){
+            if (is_multisite()) {
+                $wp_version = get_bloginfo('version');
+                $blog_id = (int) get_current_blog_id();
+                $is_old = false;
+
+                if(is_dir(get_home_path().'wp-content/blogs.dir')){
+                    $is_old = true;
+                }
+
+                if($is_old){
+                    $basic_path = 'wp-content/blogs.dir';
+                } else{
+                    $basic_path = 'wp-content/uploads';
+                }
+
+                $full_size = (int) trim(str_replace('	.','', shell_exec('du -sk '.get_home_path())));
+                $upload_full_size = (int) trim(str_replace('	.','', shell_exec('du -sk '.get_home_path(). $basic_path)));
+                if($blog_id == 1){
+                    if($is_old){
+                        $blogs_size =  (int) trim(str_replace('	.','', shell_exec('du -sk '.get_home_path(). $basic_path)));
+                    } else{
+                        $blogs_size =  (int) trim(str_replace('	.','', shell_exec('du -sk '.get_home_path(). $basic_path.'/sites')));
+                    }
+                    $blog_size =  $upload_full_size - $blogs_size;
+                } else{
+                    if($is_old){
+                        $blog_size =  (int) trim(str_replace('	.','', shell_exec('du -sk '.get_home_path(). $basic_path.'/'.$blog_id)));
+                    } else{
+                        $blog_size =  (int) trim(str_replace('	.','', shell_exec('du -sk '.get_home_path(). $basic_path.'/sites/'.$blog_id)));
+                    }
+                }
+                $total_size = $full_size - $upload_full_size + $blog_size;
+                $plugin_info['space_used'] = $total_size;
+            } else{
+                $plugin_info['space_used'] = (int) trim(str_replace('	.','', shell_exec('du -sk .')));
+            }
+        } else{
+            $plugin_info['space_used'] = 'n/a';
+        }
+
         $plugin_info['wpml_lang'] = false;
+        $login_activity_table = $wpdb->prefix.'aiowps_login_activity';
+        $data = $wpdb->get_results($wpdb->prepare("SELECT * FROM $login_activity_table ORDER BY login_date DESC LIMIT %d", 1), ARRAY_A);
+        $login_date = false;
         $table = _get_meta_table('user');
-        $meta = $wpdb->get_row("SELECT * FROM $table WHERE meta_key = 'last_login_time' ORDER BY 'meta_value' DESC LIMIT 1");
+
+        if (!empty($data) && isset($data[0]['user_id'])) {
+            $sql = "SELECT * FROM $table WHERE meta_key = 'last_login_time' AND user_id = ".$data[0]['user_id']." ORDER BY meta_value DESC LIMIT 1";
+            $login_date = $data[0]['login_date'];
+        } else{
+            $sql = "SELECT * FROM $table WHERE meta_key = 'last_login_time' ORDER BY meta_value DESC LIMIT 1";
+        }
+
+        $meta = $wpdb->get_row($sql);
         if (isset($meta->meta_value)){
             $meta->meta_value = maybe_unserialize( $meta->meta_value );
             if(isset($meta->user_id)){
                 $user_info = get_userdata($meta->user_id);
+                if($login_date === false){
+                    $login_time = strtotime($meta->meta_value);
+                } else{
+                    $login_time = strtotime($login_date);
+                }
                 $plugin_info['last_login'] = array(
                     'user_id' => $meta->user_id,
                     'user_login' => $user_info->user_login,
                     'user_mail' => $user_info->user_email,
                     'user_name' => $user_info->display_name,
-                    'time' => strtotime($meta->meta_value)
+                    'user_link' => get_edit_user_link($meta->user_id),
+                    'time' => $login_time
                 );
             }
+        }
+
+        $owner_mail = get_option('admin_email');
+        $user_owner = get_user_by_email($owner_mail);
+        if($user_owner){
+            $plugin_info['owner'] = array(
+                'user_id' => $user_owner->get('id'),
+                'user_login' => $user_owner->get('user_login'),
+                'user_mail' => $user_owner->get('user_email'),
+                'user_name' => $user_owner->get('display_name'),
+                'user_link' => get_edit_user_link($user_owner->get('id')),
+            );
         }
 
         $plugin_info['public'] = get_option('blog_public');
