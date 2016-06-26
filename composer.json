@@ -1,0 +1,11 @@
+{
+    "name": "stacksight/wordpress",
+    "description": "Stacksight support for wordpress",
+    "authors": [
+        {
+            "name": "Lior Kesos",
+            "email": "lior@linnovate.net"
+        }
+    ],
+    "require": {}
+}
