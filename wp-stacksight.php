@@ -65,7 +65,6 @@ class WPStackSightPlugin {
     }
 
     public function showStackMessages(){
-        SSUtilities::checkPermissions();
         if(isset($_SESSION['STACKSIGHT_MESSAGE']) && !empty($_SESSION['STACKSIGHT_MESSAGE']) && is_array($_SESSION['STACKSIGHT_MESSAGE'])){
             foreach($_SESSION['STACKSIGHT_MESSAGE'] as $message){
                 add_settings_error('', '', $message);
@@ -330,12 +329,9 @@ class WPStackSightPlugin {
             }
 
             $res = $this->ss_client->publishEvent($event);
-
             if($ready_show_debug === true){
-                if(SSUtilities::checkPermissions()){
-                    if(isset($_SESSION['stacksight_debug']['events']) && !empty($_SESSION['stacksight_debug']['events'])){
-                        SSUtilities::error_log(print_r($_SESSION['stacksight_debug']['events'], true), 'debug_events', true);
-                    }
+                if(isset($_SESSION['stacksight_debug']['events']) && !empty($_SESSION['stacksight_debug']['events'])){
+                    SSUtilities::error_log(print_r($_SESSION['stacksight_debug']['events'], true), 'debug_events', true);
                 }
             }
             if (!$res['success']) SSUtilities::error_log($res['message'], 'error');
@@ -987,10 +983,7 @@ class WPStackSightPlugin {
     public function sanitize($input) {
         $new_input = array();
 
-//        if(!$input['_id']) add_settings_error('_id', '_id', '"App ID" can not be empty');
         if(!$input['token']) add_settings_error('token', 'token', '"App Acces Token" can not be empty');
-//        if(!$input['group']) add_settings_error('group', 'group', '"App group" can not be empty');
-
         $any_errors = $this->any_form_errors();
 
         if(defined('STACKSIGHT_SETTINGS_IN_DB') && STACKSIGHT_SETTINGS_IN_DB === true){
@@ -998,7 +991,7 @@ class WPStackSightPlugin {
             $new_input['token'] = $input['token'];
             $new_input['group'] = $input['group'];
         }
-        $new_input['enable_options'] = array_keys($input['enable_options']);
+
         $new_input['cron_updates_interval'] = $input['cron_updates_interval'];
         // schedule the updates action
         wp_clear_scheduled_hook('stacksight_main_action');
