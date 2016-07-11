@@ -7,52 +7,33 @@ Stable tag: 1.9.4
 License: GPLv2 or later
 
 
-<h3>Realtime inisights for you wordpress applications</h3>
-Get a realtime stream of events and logs from your wordpress applications (and other opensource applications as well!)
+Operational Insights for your Open Source Applications
+Manage all your open source apps from one easy-to-use dashboard. From updates to backups and security, Stacksight will allow you to solve problems faster, reduce troubleshooting time and avoid the constant juggling between different plug-ins and tools.
 
 == Description ==
 
-<strong>Stacksight logs the next events to the stacksight.io dashboard</strong><br />
+StackSight provides operational insights for opensource applications providing  live sream of logs and events,  Security, Performance and Accessibility, and additional health metrics and integrations to .
 
-* <strong>WordPress</strong> - Core Updates
-* <strong>Posts</strong> - Created, Updated, Deleted
-* <strong>Pages</strong> - Created, Updated, Deleted
-* <strong>Custom Post Type</strong> - Created, Updated, Deleted
-* <strong>Tags</strong> - Created, Edited, Deleted
-* <strong>Categories</strong> - Created, Edited, Deleted
-* <strong>Taxonomies</strong> - Created, Edited, Deleted
-* <strong>Comments</strong> - Created, Approved, Unproved, Trashed, Untrashed, Spammed, Unspammed, Deleted
-* <strong>Media</strong> - Uploaded, Edited, Deleted
-* <strong>Users</strong> - Login, Logout, Login has failed, Update profile, Registered and Deleted
-* <strong>Plugins</strong> - Installed, Updated, Activated, Deactivated, Changed
-* <strong>Themes</strong> - Installed, Updated, Deleted, Activated, Changed (Editor and Customizer)
-* <strong>Widgets</strong> - Added to a sidebar / Deleted from a sidebar, Order widgets
-* <strong>Menus</strong> - A menu is being Created, Updated, Deleted
-* <strong>Setting</strong> - General, Writing, Reading, Discussion, Media, Permalinks
-* <strong>Options</strong> - Can be extend by east filter
-* <strong>Export</strong> - User download export file from the site
-* <strong>WooCommerce</strong> - Monitor all shop options
-* <strong>bbPress</strong> - Forums, Topics, Replies, Taxonomies and other actions
-* and much more...
+If you have more than 3-5 websites, you’re quickly overwhelmed by events and updates on them. Stacksight puts all the information in a one easy-to-use dashboard and allows you to diagnose and solve problems faster, reduce troubleshooting time and avoid the constant juggling between different plug-ins and tools.
 
-
-
-<strong>Contributions:</strong><br />
 ==== stacksight ====
 stacksight contributions can be done through submiting PRS to the [Github repo](http://github.com/stacksight/wordpress).
 
 == Installation ==
 
-1. Upload the stacksight plugin to your plugins folder, or install using WordPress' built-in Add New Plugin installer
-1. Activate the plugin
-1. Go to the 
+1. Upload the Stacksight plugin to your plugins folder, or install using WordPress' built-in Add New Plugin installer
+2. Activate the plugin
+3. Create a stack in a group: Go to https://apps.stacksight.io/
+
+    3.1 If you do not have a group yet, create a group.
+4. In your group, add a new wordpress stack by inserting the URL or by “Add a local stack” and follow the instructions.
 
 == Screenshots ==
 
-1. The log viewer page
-2. The settings page
-3. Screen Options
-4. Interface for defining notification rules
+1. The general settings page
+2. The features settings page
+3. Add stack
+4. Add custom stack
 
 == Frequently Asked Questions ==
 
