@@ -65,10 +65,13 @@ class WPStackSightPlugin {
             add_action('upgrader_process_complete', array( &$this, 'stacksightPluginInstallUpdate' ), 10, 2);
             add_action('activated_plugin', array(&$this, 'stacksightActivatedPlugin'),100, 2);
             add_action('deactivated_plugin', array(&$this, 'stacksightDeactivatedPlugin'), 100, 2);
-
             add_action('updated_option', array(&$this, 'action_updated_option'), 100, 3);
-
+            add_action('wpmu_new_blog', 'stacksightAddNewBlog', 10, 6);
         }
+    }
+
+    public  function stacksightAddNewBlog($blog_id, $user_id, $domain, $path, $site_id, $meta){
+        die('ADD SUBSITE');
     }
 
     public function action_updated_option( $option, $old_value, $value ) {
@@ -81,7 +84,7 @@ class WPStackSightPlugin {
             $data = array(
                 'data' => $inventory
             );
-            $xxx = $this->ss_client->sendInventory($data);
+            $this->ss_client->sendInventory($data);
         }
     }
 
