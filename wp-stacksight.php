@@ -63,10 +63,10 @@ class WPStackSightPlugin {
             add_action('stacksight_main_action', array($this, 'cron_do_main_job'));
 
             add_action('upgrader_process_complete', array( &$this, 'stacksightPluginInstallUpdate' ), 10, 2);
-            add_action('activated_plugin', array(&$this, 'stacksightActivatedPlugin'));
-            add_action('deactivated_plugin', array(&$this, 'stacksightDeactivatedPlugin'));
+            add_action('activated_plugin', array(&$this, 'stacksightActivatedPlugin'),100, 2);
+            add_action('deactivated_plugin', array(&$this, 'stacksightDeactivatedPlugin'), 100, 2);
 
-            add_action('updated_option', array(&$this, 'action_updated_option'), 10, 3 );
+            add_action('updated_option', array(&$this, 'action_updated_option'), 100, 3);
 
         }
     }
@@ -75,24 +75,24 @@ class WPStackSightPlugin {
         $this->handshake();
     }
 
-    private function sendInventory(){
-        $inventory = $this->getInventory();
-        if(!empty($inventory)){
+    private function sendInventory($plugin_name = false){
+        $inventory = $this->getInventory($plugin_name);
+        if (!empty($inventory)) {
             $data = array(
                 'data' => $inventory
             );
-            $this->ss_client->sendInventory($data);
+            $xxx = $this->ss_client->sendInventory($data);
         }
     }
 
-    public function stacksightActivatedPlugin($plugin_name){
-        $this->sendInventory();
+    public function stacksightActivatedPlugin($plugin_name, $network_wide){
+        $this->sendInventory($plugin_name);
         $this->handshake();
 //        die('Activate plugin');
     }
 
-    public function stacksightDeactivatedPlugin($plugin_name){
-        $this->sendInventory();
+    public function stacksightDeactivatedPlugin($plugin_name, $network_wide){
+        $this->sendInventory($plugin_name);
         $this->handshake();
 //        die('Deactivate plugin');
     }
@@ -157,10 +157,8 @@ class WPStackSightPlugin {
             $old_hash_state = $tempory['hash_of_state'];
             $date_of_old_hash_state = $tempory['date_of_set'];
         }
-        print_r($total_state);
         // If we have changed state
         if($total_hash_state != $old_hash_state){
-            print_r('CHANGE STATE');
             $time = time();
             // Send new state
             $handshake_event = array(
@@ -392,7 +390,7 @@ class WPStackSightPlugin {
         );
     }
 
-    public function getInventory(){
+    public function getInventory($plugin_name = false){
         $object_plugins = get_plugins();
         $object_themes = get_themes();
         $plugins = array();
@@ -400,13 +398,18 @@ class WPStackSightPlugin {
 
         if($object_plugins && is_array($object_plugins)){
             foreach($object_plugins as $path => $plugin){
+                if($plugin_name && $path == $plugin_name){
+                    $active = (is_plugin_active($path)) ? false : true;
+                } else{
+                    $active =  (is_plugin_active($path)) ? true : false;
+                }
                 $plugins[] = array(
                     'type' => SSWordpressClient::TYPE_PLUGIN,
                     'name' => ($plugin['TextDomain']) ? $plugin['TextDomain'] : basename($path),
                     'version' => $plugin['Version'],
                     'label' => $plugin['Name'],
                     'description' => $plugin['Description'],
-                    'active' => (is_plugin_active($path)) ? true : false,
+                    'active' => $active,
                     'requires' => array()
                 );
             }
@@ -1332,7 +1335,9 @@ class WPStackSightPlugin {
 
     public function getTotalState(){
         global $wpdb;
-
+        if (!function_exists('get_home_path')) {
+            require_once( ABSPATH . '/wp-admin/includes/file.php' );
+        }
         $plugin_info = get_plugin_data(dirname(__FILE__).'/wp-stacksight.php');
         if(function_exists('exec')){
             if (is_multisite()) {
