@@ -61,7 +61,46 @@ class WPStackSightPlugin {
                 }
             }
             add_action('stacksight_main_action', array($this, 'cron_do_main_job'));
+
+            add_action('upgrader_process_complete', array( &$this, 'stacksightPluginInstallUpdate' ), 10, 2);
+            add_action('activated_plugin', array(&$this, 'stacksightActivatedPlugin'));
+            add_action('deactivated_plugin', array(&$this, 'stacksightDeactivatedPlugin'));
+
+            add_action('updated_option', array(&$this, 'action_updated_option'), 10, 3 );
+
         }
+    }
+
+    public function action_updated_option( $option, $old_value, $value ) {
+        $this->handshake();
+    }
+
+    private function sendInventory(){
+        $inventory = $this->getInventory();
+        if(!empty($inventory)){
+            $data = array(
+                'data' => $inventory
+            );
+            $this->ss_client->sendInventory($data);
+        }
+    }
+
+    public function stacksightActivatedPlugin($plugin_name){
+        $this->sendInventory();
+        $this->handshake();
+//        die('Activate plugin');
+    }
+
+    public function stacksightDeactivatedPlugin($plugin_name){
+        $this->sendInventory();
+        $this->handshake();
+//        die('Deactivate plugin');
+    }
+
+    public function stacksightPluginInstallUpdate($upgrader, $extra){
+        $this->sendInventory();
+        $this->handshake();
+//        die('Install/Update plugin');
     }
 
     public function showStackMessages(){
@@ -118,9 +157,10 @@ class WPStackSightPlugin {
             $old_hash_state = $tempory['hash_of_state'];
             $date_of_old_hash_state = $tempory['date_of_set'];
         }
-
+        print_r($total_state);
         // If we have changed state
         if($total_hash_state != $old_hash_state){
+            print_r('CHANGE STATE');
             $time = time();
             // Send new state
             $handshake_event = array(
@@ -141,7 +181,6 @@ class WPStackSightPlugin {
             } else{
                 add_option('stacksight_state', serialize($new_state_to_db));
             }
-
             $this->ss_client->publishEvent($handshake_event, true);
         }
     }
@@ -991,12 +1030,10 @@ class WPStackSightPlugin {
             $new_input['token'] = $input['token'];
             $new_input['group'] = $input['group'];
         }
-
         $new_input['cron_updates_interval'] = $input['cron_updates_interval'];
         // schedule the updates action
         wp_clear_scheduled_hook('stacksight_main_action');
         wp_schedule_event(time(), 'updates_interval', 'stacksight_main_action');
-
         return $new_input;
     }
 
