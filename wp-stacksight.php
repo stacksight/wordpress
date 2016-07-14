@@ -66,7 +66,7 @@ class WPStackSightPlugin {
             add_action('activated_plugin', array(&$this, 'stacksightActivatedPlugin'),100, 2);
             add_action('deactivated_plugin', array(&$this, 'stacksightDeactivatedPlugin'), 100, 2);
             add_action('updated_option', array(&$this, 'action_updated_option'), 100, 3);
-            add_action('wpmu_new_blog', 'stacksightAddNewBlog', 10, 6);
+            add_action('wpmu_new_blog', array(&$this, 'stacksightAddNewBlog'), 10, 6);
         }
     }
 
