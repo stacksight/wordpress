@@ -71,20 +71,21 @@ class WPStackSightPlugin {
     }
 
     public  function stacksightAddNewBlog($blog_id, $user_id, $domain, $path, $site_id, $meta){
-        die('ADD SUBSITE');
+        $this->sendInventory(false, $domain);
+        $this->handshake(false, $domain);
     }
 
-    public function action_updated_option( $option, $old_value, $value ) {
+    public function action_updated_option($option, $old_value, $value) {
         $this->handshake();
     }
 
-    private function sendInventory($plugin_name = false){
+    private function sendInventory($plugin_name = false, $host = false){
         $inventory = $this->getInventory($plugin_name);
         if (!empty($inventory)) {
             $data = array(
                 'data' => $inventory
             );
-            $this->ss_client->sendInventory($data);
+            $this->ss_client->sendInventory($data, $host);
         }
     }
 
@@ -145,14 +146,13 @@ class WPStackSightPlugin {
         return $schedules;
     }
 
-    public function handshake(){
+    public function handshake($multiCurl = false, $domain = false){
         $total_state = $this->getTotalState();
         $total_hash_state = md5(serialize($total_state));
         $old_hash_exist = false;
         $old_hash_state = false;
         $date_of_old_hash_state = false;
         $state_option = false;
-
 
         if($state_option = get_option('stacksight_state')){
             $tempory = unserialize($state_option);
@@ -182,7 +182,7 @@ class WPStackSightPlugin {
             } else{
                 add_option('stacksight_state', serialize($new_state_to_db));
             }
-            $this->ss_client->publishEvent($handshake_event, true);
+            $this->ss_client->publishEvent($handshake_event, $multiCurl, $domain);
         }
     }
 
@@ -192,7 +192,7 @@ class WPStackSightPlugin {
 
         SSUtilities::error_log('cron_do_main_job has been run', 'cron_log');
 
-        $this->handshake();
+        $this->handshake(true);
 
         // updates
         if(defined('STACKSIGHT_INCLUDE_UPDATES') && STACKSIGHT_INCLUDE_UPDATES == true){
