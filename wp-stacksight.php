@@ -63,8 +63,8 @@ class WPStackSightPlugin {
             add_action('stacksight_main_action', array($this, 'cron_do_main_job'));
 
             add_action('upgrader_process_complete', array( &$this, 'stacksightPluginInstallUpdate' ), 10, 2);
-            add_action('activated_plugin', array(&$this, 'stacksightActivatedPlugin'),100, 2);
-            add_action('deactivated_plugin', array(&$this, 'stacksightDeactivatedPlugin'), 100, 2);
+            add_action('activated_plugin', array(&$this, 'stacksightActivatedPlugin'));
+            add_action('deactivated_plugin', array(&$this, 'stacksightDeactivatedPlugin'));
             add_action('updated_option', array(&$this, 'action_updated_option'), 100, 3);
             add_action('wpmu_new_blog', array(&$this, 'stacksightAddNewBlog'), 10, 6);
         }
@@ -80,35 +80,32 @@ class WPStackSightPlugin {
         $this->handshake();
     }
 
-    private function sendInventory($plugin_name = false, $host = false){
+    private function sendInventory($plugin_name = false, $multicurl = true, $host = false){
         $inventory = $this->getInventory($plugin_name);
         if (!empty($inventory)) {
             $data = array(
                 'data' => $inventory
             );
-            $this->ss_client->sendInventory($data, true, $host);
+            $this->ss_client->sendInventory($data, $multicurl, $host);
         }
     }
 
-    public function stacksightActivatedPlugin($plugin_name, $network_wide){
-        $this->sendInventory($plugin_name);
+    public function stacksightActivatedPlugin($plugin_name){
+        $this->sendInventory($plugin_name, false);
         $this->handshake(true);
         $this->ss_client->sendMultiCURL();
-//        die('Activate plugin');
     }
 
-    public function stacksightDeactivatedPlugin($plugin_name, $network_wide){
+    public function stacksightDeactivatedPlugin($plugin_name){
         $this->sendInventory($plugin_name);
         $this->handshake(true);
         $this->ss_client->sendMultiCURL();
-//        die('Deactivate plugin');
     }
 
     public function stacksightPluginInstallUpdate($upgrader, $extra){
         $this->sendInventory();
         $this->handshake(true);
         $this->ss_client->sendMultiCURL();
-//        die('Install/Update plugin');
     }
 
     public function showStackMessages(){
