@@ -71,8 +71,9 @@ class WPStackSightPlugin {
     }
 
     public  function stacksightAddNewBlog($blog_id, $user_id, $domain, $path, $site_id, $meta){
-        $this->sendInventory(false, $domain);
-        $this->handshake(false, $domain);
+        $this->sendInventory(true, $domain);
+        $this->handshake(true, $domain);
+        $this->ss_client->sendMultiCURL();
     }
 
     public function action_updated_option($option, $old_value, $value) {
@@ -85,25 +86,28 @@ class WPStackSightPlugin {
             $data = array(
                 'data' => $inventory
             );
-            $this->ss_client->sendInventory($data, $host);
+            $this->ss_client->sendInventory($data, true, $host);
         }
     }
 
     public function stacksightActivatedPlugin($plugin_name, $network_wide){
         $this->sendInventory($plugin_name);
-        $this->handshake();
+        $this->handshake(true);
+        $this->ss_client->sendMultiCURL();
 //        die('Activate plugin');
     }
 
     public function stacksightDeactivatedPlugin($plugin_name, $network_wide){
         $this->sendInventory($plugin_name);
-        $this->handshake();
+        $this->handshake(true);
+        $this->ss_client->sendMultiCURL();
 //        die('Deactivate plugin');
     }
 
     public function stacksightPluginInstallUpdate($upgrader, $extra){
         $this->sendInventory();
-        $this->handshake();
+        $this->handshake(true);
+        $this->ss_client->sendMultiCURL();
 //        die('Install/Update plugin');
     }
 
