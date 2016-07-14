@@ -37,13 +37,6 @@ class WPStackSightPlugin {
         register_activation_hook( __FILE__, array(__CLASS__, 'install'));
         register_deactivation_hook( __FILE__, array(__CLASS__, 'uninstall'));
 
-        if(is_admin()) {
-            add_action('admin_menu', array($this, 'add_plugin_page'));
-            add_action('admin_init', array($this, 'page_init'));
-            add_action('admin_notices', array($this, 'show_errors'));
-            add_filter( 'plugin_action_links_' . plugin_basename(__FILE__), array($this, 'stacksight_plugin_action_links'));
-        }
-
         $this->_setUpMultidomainsConfig(array('STACKSIGHT_APP_ID', 'STACKSIGHT_TOKEN', 'STACKSIGHT_GROUP'));
 
         if (defined('STACKSIGHT_TOKEN') && defined('STACKSIGHT_BOOTSTRAPED')) {
@@ -63,10 +56,17 @@ class WPStackSightPlugin {
             add_action('stacksight_main_action', array($this, 'cron_do_main_job'));
 
             add_action('upgrader_process_complete', array( &$this, 'stacksightPluginInstallUpdate' ), 10, 2);
-            add_action('activated_plugin', array(&$this, 'stacksightActivatedPlugin'));
+            add_action('activate_plugin', array(&$this, 'stacksightActivatedPlugin'));
             add_action('deactivated_plugin', array(&$this, 'stacksightDeactivatedPlugin'));
             add_action('updated_option', array(&$this, 'action_updated_option'), 100, 3);
             add_action('wpmu_new_blog', array(&$this, 'stacksightAddNewBlog'), 10, 6);
+
+            if(is_admin()) {
+                add_action('admin_menu', array($this, 'add_plugin_page'));
+                add_action('admin_init', array($this, 'page_init'));
+                add_action('admin_notices', array($this, 'show_errors'));
+                add_filter('plugin_action_links_' . plugin_basename(__FILE__), array($this, 'stacksight_plugin_action_links'));
+            }
         }
     }
 
@@ -91,7 +91,7 @@ class WPStackSightPlugin {
     }
 
     public function stacksightActivatedPlugin($plugin_name){
-        $this->sendInventory($plugin_name, false);
+        $this->sendInventory($plugin_name);
         $this->handshake(true);
         $this->ss_client->sendMultiCURL();
     }
