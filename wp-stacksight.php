@@ -25,6 +25,9 @@ class WPStackSightPlugin {
     private $health;
     private $dep_plugins = array();
 
+    const ACTION_ACTIVATE_DEACTIVATE = 'action_activate_deactivate';
+    const ACTION_REMOVE = 'action_remove';
+
     public $defaultDefines = array(
         'STACKSIGHT_INCLUDE_LOGS' => false,
         'STACKSIGHT_INCLUDE_HEALTH' => true,
@@ -56,6 +59,7 @@ class WPStackSightPlugin {
             add_action('stacksight_main_action', array($this, 'cron_do_main_job'));
 
             add_action('upgrader_process_complete', array( &$this, 'stacksightPluginInstallUpdate' ), 10, 2);
+            add_action('delete_plugin', array( &$this, 'stacksightPluginDelete' ), 10, 1);
             add_action('activate_plugin', array(&$this, 'stacksightActivatedPlugin'));
             add_action('deactivated_plugin', array(&$this, 'stacksightDeactivatedPlugin'));
             add_action('updated_option', array(&$this, 'action_updated_option'), 100, 3);
@@ -80,8 +84,8 @@ class WPStackSightPlugin {
         $this->handshake();
     }
 
-    private function sendInventory($plugin_name = false, $multicurl = true, $host = false){
-        $inventory = $this->getInventory($plugin_name);
+    private function sendInventory($plugin_name = false, $multicurl = true, $host = false, $action = false){
+        $inventory = $this->getInventory($plugin_name, $action);
         if (!empty($inventory)) {
             $data = array(
                 'data' => $inventory
@@ -91,19 +95,25 @@ class WPStackSightPlugin {
     }
 
     public function stacksightActivatedPlugin($plugin_name){
-        $this->sendInventory($plugin_name);
+        $this->sendInventory($plugin_name, true, false, self::ACTION_ACTIVATE_DEACTIVATE);
         $this->handshake(true);
         $this->ss_client->sendMultiCURL();
     }
 
     public function stacksightDeactivatedPlugin($plugin_name){
-        $this->sendInventory($plugin_name);
+        $this->sendInventory($plugin_name, true, false, self::ACTION_ACTIVATE_DEACTIVATE);
         $this->handshake(true);
         $this->ss_client->sendMultiCURL();
     }
 
     public function stacksightPluginInstallUpdate($upgrader, $extra){
         $this->sendInventory();
+        $this->handshake(true);
+        $this->ss_client->sendMultiCURL();
+    }
+
+    public function stacksightPluginDelete($plugin_name){
+        $this->sendInventory($plugin_name, true, false, self::ACTION_REMOVE);
         $this->handshake(true);
         $this->ss_client->sendMultiCURL();
     }
@@ -394,7 +404,7 @@ class WPStackSightPlugin {
         );
     }
 
-    public function getInventory($plugin_name = false){
+    public function getInventory($plugin_name = false, $action = false){
         $object_plugins = get_plugins();
         $object_themes = get_themes();
         $plugins = array();
@@ -402,11 +412,25 @@ class WPStackSightPlugin {
 
         if($object_plugins && is_array($object_plugins)){
             foreach($object_plugins as $path => $plugin){
-                if($plugin_name && $path == $plugin_name){
-                    $active = (is_plugin_active($path)) ? false : true;
-                } else{
-                    $active =  (is_plugin_active($path)) ? true : false;
+                if($action){
+                    switch ($action){
+                        case self::ACTION_ACTIVATE_DEACTIVATE:
+                            if($plugin_name && $path == $plugin_name){
+                                $active = (is_plugin_active($path)) ? false : true;
+                            } else{
+                                $active =  (is_plugin_active($path)) ? true : false;
+                            }
+                            break;
+                        case self::ACTION_REMOVE:
+                            if($plugin_name && $path == $plugin_name){
+                                continue;
+                            }
+                            break;
+                        default:
+                            break;
+                    }
                 }
+
                 $plugins[] = array(
                     'type' => SSWordpressClient::TYPE_PLUGIN,
                     'name' => ($plugin['TextDomain']) ? $plugin['TextDomain'] : basename($path),
