@@ -1443,6 +1443,7 @@ class WPStackSightPlugin {
         }
 
         $owner_mail = get_option('admin_email');
+
         $user_owner = get_user_by_email($owner_mail);
         if($user_owner){
             $plugin_info['owner'] = array(
@@ -1454,6 +1455,7 @@ class WPStackSightPlugin {
             );
         }
 
+        $plugin_info['title'] = (get_option('blogname')) ? get_option('blogname') : false;
         $plugin_info['public'] = get_option('blog_public');
         $plugin_info['url'] = get_home_url();
 
