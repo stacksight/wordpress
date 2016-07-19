@@ -437,7 +437,7 @@ class WPStackSightPlugin {
                     'version' => $plugin['Version'],
                     'label' => $plugin['Name'],
                     'description' => $plugin['Description'],
-                    'active' => $active,
+                    'active' => (isset($active)) ? $active : is_plugin_active($path),
                     'requires' => array()
                 );
             }
@@ -1455,7 +1455,7 @@ class WPStackSightPlugin {
             );
         }
 
-        $plugin_info['title'] = (get_option('blogname')) ? get_option('blogname') : false;
+        $plugin_info['blog_title'] = (get_option('blogname')) ? get_option('blogname') : false;
         $plugin_info['public'] = get_option('blog_public');
         $plugin_info['url'] = get_home_url();
 
