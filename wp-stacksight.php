@@ -369,7 +369,7 @@ class WPStackSightPlugin {
         if($blogs){
             $blogs_array = array();
             foreach($blogs as $blog) {
-                $blogs_array[$blog->blog_id] = $blog->domain;
+                $blogs_array[] = $blog->domain;
             }
             add_option($param, json_encode($blogs_array));
         }
@@ -489,6 +489,7 @@ class WPStackSightPlugin {
     }
 
     public function sendInventories($plugin_name = false, $action = false, $multicurl){
+        global $wpdb;
         if(is_multisite() && is_main_site()){
             $queue = get_option('stacksight_updates_queue');
             if($queue){
@@ -496,7 +497,21 @@ class WPStackSightPlugin {
                 $slice_size = (defined('MULTI_SENDS_UPDATES_PER_REQUEST')) ? MULTI_SENDS_UPDATES_PER_REQUEST : self::MULTI_SENDS_UPDATES_PER_REQUEST;
                 $blogs = array_slice($blogs_array, 0 , $slice_size);
                 if(sizeof($blogs) > 0){
-                    foreach($blogs as $blog_id => $blog){
+
+                    $sql = $wpdb->prepare("SELECT blog_id, domain, path FROM $wpdb->blogs WHERE archived='0' AND deleted ='0'", '');
+                    $blogs_db = $wpdb->get_results($sql);
+                    if($blogs_db){
+                        $blogs_assoc_array = array();
+                        foreach($blogs_db as $blog) {
+                            $blogs_assoc_array[$blog->domain] = $blog->blog_id;
+                        }
+                    }
+                    foreach($blogs as $blog){
+                        if(isset($blogs_assoc_array[$blogs_db])){
+                            $blog_id = $blogs_assoc_array[$blogs_db];
+                        } else{
+                            $blog_id = false;
+                        }
                         $inventory =  $this->getInventory($plugin_name, $action, $blog_id);
                         if (!empty($inventory)) {
                             $data = array(
