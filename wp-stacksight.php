@@ -497,6 +497,7 @@ class WPStackSightPlugin {
     }
 
     public function sendInventories($plugin_name = false, $action = false, $multicurl = false, $upgrader = false, $extra = false){
+        global $wpdb;
         $updated = false;
         if($upgrader && $extra){
             if ($extra['action'] == 'update') {
@@ -504,7 +505,7 @@ class WPStackSightPlugin {
                 $updated = get_plugin_data( $upgrader->skin->result['local_destination'] . '/' . $path, true, false );
             }
         }
-        global $wpdb;
+
         if(is_multisite()){
             $queue = get_option('stacksight_inventory_queue');
             if($queue){
@@ -541,7 +542,7 @@ class WPStackSightPlugin {
         }
     }
 
-    public function getInventory($plugin_name = false, $action = false, $blog_id = false, $updated = false){
+    public function getInventory($plugin_name = false, $action = false, $blog_id = false, $updated = false, $deleted = false){
         $object_plugins = get_plugins();
         $object_themes = get_themes();
         $plugins = array();
@@ -549,6 +550,7 @@ class WPStackSightPlugin {
 
         if($object_plugins && is_array($object_plugins)){
             foreach($object_plugins as $path => $plugin){
+                $skip = false;
                 if($action){
                     switch ($action){
                         case self::ACTION_ACTIVATE_DEACTIVATE:
@@ -569,7 +571,7 @@ class WPStackSightPlugin {
                             break;
                         case self::ACTION_REMOVE:
                             if($plugin_name && $path == $plugin_name){
-                                continue;
+                                $skip = true;
                             }
                             break;
                         default:
@@ -582,16 +584,17 @@ class WPStackSightPlugin {
                 } else{
                     $version = $plugin['Version'];
                 }
-
-                $plugins[] = array(
-                    'type' => SSWordpressClient::TYPE_PLUGIN,
-                    'name' => ($plugin['TextDomain']) ? $plugin['TextDomain'] : basename($path),
-                    'version' => $version,
-                    'label' => $plugin['Name'],
-                    'description' => $plugin['Description'],
-                    'active' => (isset($active)) ? $active : is_plugin_active($path),
-                    'requires' => array()
-                );
+                if($skip === false){
+                    $plugins[] = array(
+                        'type' => SSWordpressClient::TYPE_PLUGIN,
+                        'name' => ($plugin['TextDomain']) ? $plugin['TextDomain'] : basename($path),
+                        'version' => $version,
+                        'label' => $plugin['Name'],
+                        'description' => $plugin['Description'],
+                        'active' => (isset($active)) ? $active : is_plugin_active($path),
+                        'requires' => array()
+                    );
+                }
             }
         }
 
