@@ -82,7 +82,7 @@ class WPStackSightPlugin {
     }
 
     public function stacksightAddNewBlog($blog_id, $user_id, $domain, $path, $site_id, $meta){
-        $this->sendInventory(true, $domain);
+        $this->sendInventory(false, true, $domain);
         $this->handshake(true, $domain);
         $this->ss_client->sendMultiCURL();
     }
@@ -303,13 +303,7 @@ class WPStackSightPlugin {
         }
 
         if(defined('STACKSIGHT_INCLUDE_INVENTORY') && STACKSIGHT_INCLUDE_INVENTORY == true){
-            $inventory = $this->getInventory();
-            if(!empty($inventory)){
-                $data = array(
-                    'data' => $inventory
-                );
-                $this->ss_client->sendInventory($data, true);
-            }
+            $this->sendInventories();
         }
 
         $this->ss_client->sendMultiCURL();
@@ -333,7 +327,7 @@ class WPStackSightPlugin {
                 }
                 if(isset($queue) && sizeof($queue) > 0){
                     $blogs_array = $queue;
-                    $slice_size = (defined('MULTI_SENDS_UPDATES_PER_REQUEST')) ? MULTI_SENDS_UPDATES_PER_REQUEST : self::MULTI_SENDS_UPDATES_PER_REQUEST;
+                    $slice_size = (defined('STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST')) ? MULTI_SENDS_UPDATES_PER_REQUEST : self::MULTI_SENDS_UPDATES_PER_REQUEST;
                     $blogs = array_slice($blogs_array, 0 , $slice_size);
                     if(sizeof($blogs) > 0){
                         foreach($blogs as $blog){
@@ -542,10 +536,14 @@ class WPStackSightPlugin {
                             $this->ss_client->sendInventory($data, $multicurl, $blog);
                         }
                     }
+                } else{
+                    $this->sendInventory($plugin_name, true, false, $action);
                 }
+            } else{
+                $this->sendInventory($plugin_name, true, false, $action);
             }
         } else{
-            $this->sendInventory($plugin_name, $action);
+            $this->sendInventory($plugin_name, true, false, $action);
         }
     }
 
