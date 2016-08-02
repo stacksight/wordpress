@@ -186,8 +186,8 @@ class WPStackSightPlugin {
         return $schedules;
     }
 
-    public function handshake($multiCurl = false, $domain = false){
-        $total_state = $this->getTotalState();
+    public function handshake($multiCurl = false, $host = false){
+        $total_state = $this->getTotalState($host);
         $total_hash_state = md5(serialize($total_state));
         $old_hash_exist = false;
         $old_hash_state = false;
@@ -222,7 +222,7 @@ class WPStackSightPlugin {
             } else{
                 add_option('stacksight_state', serialize($new_state_to_db));
             }
-            $this->ss_client->publishEvent($handshake_event, $multiCurl, $domain);
+            $this->ss_client->publishEvent($handshake_event, $multiCurl, $host);
         }
     }
 
@@ -307,6 +307,27 @@ class WPStackSightPlugin {
         }
 
         $this->ss_client->sendMultiCURL();
+    }
+
+    function getBlogOption($host, $param, $default_param = false)
+    {
+        global $wpdb;
+        $sql = $wpdb->prepare("SELECT blog_id, domain, path FROM $wpdb->blogs WHERE archived='0' AND deleted ='0'", '');
+        $blogs = $wpdb->get_results($sql);
+        if($blogs){
+            $is_result = false;
+            foreach($blogs as $blog){
+                if($blog->domain == $host){
+                    $is_result == true;
+                    return get_blog_option($blog->blog_id, $param, $default_param));
+                }
+            }
+            if($is_result === false){
+                return $default_param;
+            }
+        } else{
+            return $default_param;
+        }
     }
 
     function is_blog_plugin_active($plugin, $blog_id)
@@ -1543,7 +1564,7 @@ class WPStackSightPlugin {
         return array('list' => array_reverse($list), 'show_code' => $show_code);
     }
 
-    public function getTotalState(){
+    public function getTotalState($host = false){
         global $wpdb;
         if (!function_exists('get_home_path')) {
             require_once( ABSPATH . '/wp-admin/includes/file.php' );
@@ -1624,7 +1645,15 @@ class WPStackSightPlugin {
             }
         }
 
-        $owner_mail = get_option('admin_email');
+        if($host){
+            $owner_mail = $this->getBlogOption($host, 'admin_email', false);
+            $plugin_info['blog_title'] = $this->getBlogOption($host, 'blogname', false);
+            $plugin_info['public'] = $this->getBlogOption($host, 'blog_public', false);
+        } else{
+            $owner_mail = get_option('admin_email');
+            $plugin_info['blog_title'] = (get_option('blogname')) ? get_option('blogname') : false;
+            $plugin_info['public'] = get_option('blog_public');
+        }
 
         $user_owner = get_user_by_email($owner_mail);
         if($user_owner){
@@ -1637,8 +1666,6 @@ class WPStackSightPlugin {
             );
         }
 
-        $plugin_info['blog_title'] = (get_option('blogname')) ? get_option('blogname') : false;
-        $plugin_info['public'] = get_option('blog_public');
         $plugin_info['url'] = get_home_url();
 
         return array(
