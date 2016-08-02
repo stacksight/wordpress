@@ -82,7 +82,7 @@ class WPStackSightPlugin {
     }
 
     public function stacksightAddNewBlog($blog_id, $user_id, $domain, $path, $site_id, $meta){
-        cron_do_main_job($domain);
+        $this->cron_do_main_job($domain);
         $this->sendInventory(false, true, $domain);
         $this->ss_client->sendMultiCURL();
     }
