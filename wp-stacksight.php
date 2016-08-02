@@ -82,13 +82,17 @@ class WPStackSightPlugin {
     }
 
     public function stacksightAddNewBlog($blog_id, $user_id, $domain, $path, $site_id, $meta){
-        $this->cron_do_main_job($domain);
+        print_r('$blog_id - '.$blog_id.'<br>');
+        print_r('$user_id - '.$user_id.'<br>');
+        print_r('$domain - '.$domain.'<br>');
+
+	$this->cron_do_main_job($domain);
         $this->sendInventory(false, true, $domain);
         $this->ss_client->sendMultiCURL();
     }
 
     public function action_updated_option($option, $old_value, $value) {
-        $this->handshake();
+        //$this->handshake();
     }
 
     private function sendInventory($plugin_name = false, $multicurl = true, $host = false, $action = false, $network_wide = false, $for_all_subdomain = false, $upgrader = false, $extra = false){
@@ -229,11 +233,11 @@ class WPStackSightPlugin {
     public function cron_do_main_job($host = false) {
         if(!defined('STACKSIGHT_TOKEN') || !isset($this->ss_client) || !$this->ss_client)
             return;
+	
 
         SSUtilities::error_log('cron_do_main_job has been run', 'cron_log');
 
         $this->handshake(true, $host);
-
         // updates
         $this->sendUpdates(true, false, false, $host);
 
