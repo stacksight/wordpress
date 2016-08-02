@@ -82,8 +82,8 @@ class WPStackSightPlugin {
     }
 
     public function stacksightAddNewBlog($blog_id, $user_id, $domain, $path, $site_id, $meta){
+        cron_do_main_job($domain);
         $this->sendInventory(false, true, $domain);
-        $this->handshake(true, $domain);
         $this->ss_client->sendMultiCURL();
     }
 
@@ -226,16 +226,16 @@ class WPStackSightPlugin {
         }
     }
 
-    public function cron_do_main_job() {
+    public function cron_do_main_job($host = false) {
         if(!defined('STACKSIGHT_TOKEN') || !isset($this->ss_client) || !$this->ss_client)
             return;
 
         SSUtilities::error_log('cron_do_main_job has been run', 'cron_log');
 
-        $this->handshake(true);
+        $this->handshake(true, $host);
 
         // updates
-        $this->sendUpdates(true);
+        $this->sendUpdates(true, false, false, $host);
 
         $health = array();
 
@@ -298,7 +298,7 @@ class WPStackSightPlugin {
             }
 
             if(isset($health['data']) && !empty($health['data'])){
-                $this->ss_client->sendHealth($health, true);
+                $this->ss_client->sendHealth($health, true, $host);
             }
         }
 
@@ -314,7 +314,7 @@ class WPStackSightPlugin {
         return in_array($plugin, (array) get_blog_option($blog_id, 'active_plugins', array())) || is_plugin_active_for_network( $plugin );
     }
 
-    public function sendUpdates($multiCurl = false, $upgrader = false, $extra = false)
+    public function sendUpdates($multiCurl = true, $upgrader = false, $extra = false, $host = false)
     {
         if(defined('STACKSIGHT_INCLUDE_UPDATES') && STACKSIGHT_INCLUDE_UPDATES == true){
             $updates = array(
@@ -335,11 +335,12 @@ class WPStackSightPlugin {
                             $this->ss_client->sendUpdates($updates, $multiCurl, $blog);
                         }
                     }
+                    $this->ss_client->sendUpdates($updates, true, $host);
                 } else{
-                    $this->ss_client->sendUpdates($updates, true);
+                    $this->ss_client->sendUpdates($updates, true, $host);
                 }
             } else{
-                $this->ss_client->sendUpdates($updates, true);
+                $this->ss_client->sendUpdates($updates, true, $host);
             }
         }
     }
