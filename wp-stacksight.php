@@ -319,7 +319,7 @@ class WPStackSightPlugin {
             foreach($blogs as $blog){
                 if($blog->domain == $host){
                     $is_result == true;
-                    return get_blog_option($blog->blog_id, $param, $default_param));
+                    return get_blog_option($blog->blog_id, $param, $default_param);
                 }
             }
             if($is_result === false){
