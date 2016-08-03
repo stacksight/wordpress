@@ -1257,7 +1257,8 @@ class WPStackSightPlugin {
     public function sanitize($input) {
         $new_input = array();
 
-        if(!$input['token']) add_settings_error('token', 'token', '"App Acces Token" can not be empty');
+        if(!defined('STACKSIGHT_TOKEN')) add_settings_error('token', 'token', '"App Acces Token" can not be empty');
+
         $any_errors = $this->any_form_errors();
 
         if(defined('STACKSIGHT_SETTINGS_IN_DB') && STACKSIGHT_SETTINGS_IN_DB === true){
@@ -1650,7 +1651,7 @@ class WPStackSightPlugin {
             $owner_mail = $this->getBlogOption($host, 'admin_email', false);
             $plugin_info['blog_title'] = $this->getBlogOption($host, 'blogname', false);
             $plugin_info['public'] = $this->getBlogOption($host, 'blog_public', false);
-            $protocol = stripos($_SERVER['SERVER_PROTOCOL'],'https') === true ? 'https://' : 'http://';
+            $protocol = stripos($_SERVER['SERVER_PROTOCOL'], 'https') === true ? 'https://' : 'http://';
             $plugin_info['url'] = $protocol.$host;
 
         } else{
