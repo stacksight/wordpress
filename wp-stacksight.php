@@ -48,6 +48,16 @@ class WPStackSightPlugin {
 
         $this->_setUpMultidomainsConfig(array('STACKSIGHT_APP_ID', 'STACKSIGHT_TOKEN', 'STACKSIGHT_GROUP'));
 
+        if(file_exists(ABSPATH .'wp-content/plugins/aryo-activity-log/aryo-activity-log.php')){
+            if(is_plugin_active('aryo-activity-log/aryo-activity-log.php')){
+                define('STACKSIGHT_ACTIVE_AAL', true);
+            } else{
+                define('STACKSIGHT_ACTIVE_AAL', false);
+            }
+        } else{
+            define('STACKSIGHT_ACTIVE_AAL', false);
+        }
+
         if (defined('STACKSIGHT_TOKEN') && defined('STACKSIGHT_BOOTSTRAPED')) {
             $app_id = (defined('STACKSIGHT_APP_ID')) ?  STACKSIGHT_APP_ID : false;
             $group = (defined('STACKSIGHT_GROUP')) ?  STACKSIGHT_GROUP : false;
@@ -404,7 +414,7 @@ class WPStackSightPlugin {
     }
 
     public function insert_log_mean($args) {
-        if(defined('STACKSIGHT_INCLUDE_EVENTS') && STACKSIGHT_INCLUDE_EVENTS == true){
+        if(defined('STACKSIGHT_INCLUDE_EVENTS') && STACKSIGHT_INCLUDE_EVENTS == true && defined('STACKSIGHT_ACTIVE_AAL') && STACKSIGHT_ACTIVE_AAL === true){
             $event = array();
             if (is_user_logged_in()) {
                 $user = wp_get_current_user();
@@ -648,13 +658,6 @@ class WPStackSightPlugin {
     public function create_admin_page() {
         wp_enqueue_style('ss-admin', plugins_url('assets/css/ss-admin.css', __FILE__ ));
         $active_tab = isset( $_GET[ 'tab' ] ) ? $_GET[ 'tab' ] : 'general_settings';
-        if(file_exists(ABSPATH .'wp-content/plugins/aryo-activity-log/aryo-activity-log.php')){
-            if(is_plugin_active('aryo-activity-log/aryo-activity-log.php')){
-                define('STACKSIGHT_ACTIVE_AAL', true);
-            } else{
-                define('STACKSIGHT_ACTIVE_AAL', false);
-            }
-        }
         require_once('texts.php');
         $this->showStackMessages();
         ?>
@@ -1042,8 +1045,7 @@ class WPStackSightPlugin {
         }
 
         foreach ($thm_upd as $theme => $uitem) {
-
-            if($updated && ($updated['TextDomain'] == $uitem->display('TextDomain'))){
+            if(isset($updated) && ($updated['TextDomain'] == $uitem->display('TextDomain'))){
                 $version = $uitem->display('Version');
             } else{
                 $version = $uitem->Version;
@@ -1351,7 +1353,7 @@ class WPStackSightPlugin {
 
     public function include_events_callback(){
         $checked = '';
-        if((defined('STACKSIGHT_INCLUDE_EVENTS') && STACKSIGHT_INCLUDE_EVENTS === true) || !defined('STACKSIGHT_INCLUDE_EVENTS')){
+        if((defined('STACKSIGHT_INCLUDE_EVENTS') && STACKSIGHT_INCLUDE_EVENTS === true && STACKSIGHT_ACTIVE_AAL === true) || !defined('STACKSIGHT_INCLUDE_EVENTS')){
             $checked = 'checked';
         }
         $description = '';
