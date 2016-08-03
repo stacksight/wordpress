@@ -1650,10 +1650,14 @@ class WPStackSightPlugin {
             $owner_mail = $this->getBlogOption($host, 'admin_email', false);
             $plugin_info['blog_title'] = $this->getBlogOption($host, 'blogname', false);
             $plugin_info['public'] = $this->getBlogOption($host, 'blog_public', false);
+            $protocol = stripos($_SERVER['SERVER_PROTOCOL'],'https') === true ? 'https://' : 'http://';
+            $plugin_info['url'] = $protocol.$host;
+
         } else{
             $owner_mail = get_option('admin_email');
             $plugin_info['blog_title'] = (get_option('blogname')) ? get_option('blogname') : false;
             $plugin_info['public'] = get_option('blog_public');
+            $plugin_info['url'] = get_home_url();
         }
 
         $user_owner = get_user_by_email($owner_mail);
@@ -1666,8 +1670,6 @@ class WPStackSightPlugin {
                 'user_link' => get_edit_user_link($user_owner->get('id')),
             );
         }
-
-        $plugin_info['url'] = get_home_url();
 
         return array(
             'app' => $plugin_info,
