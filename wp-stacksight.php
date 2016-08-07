@@ -1158,11 +1158,11 @@ class WPStackSightPlugin {
             array( $this, 'sanitize' ) // Sanitize
         );
 
-        register_setting(
-            'stacksight_option_slack', // Option group
-            'stacksight_opt_slack', // Option name
-            array( $this, 'slackSanitize' ) // Sanitize
-        );
+//        register_setting(
+//            'stacksight_option_slack', // Option group
+//            'stacksight_opt_slack', // Option name
+//            array( $this, 'slackSanitize' ) // Sanitize
+//        );
 
         register_setting(
             'stacksight_option_features', // Option group
