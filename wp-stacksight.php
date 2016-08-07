@@ -15,6 +15,7 @@ require_once('stacksight-php-sdk/SSUtilities.php');
 require_once('stacksight-php-sdk/SSClientBase.php');
 require_once('stacksight-php-sdk/SSHttpRequest.php');
 require_once('stacksight-php-sdk/platforms/SSWordpressClient.php');
+include_once(ABSPATH.'wp-admin/includes/plugin.php');
 
 class WPStackSightPlugin {
 
@@ -86,13 +87,13 @@ class WPStackSightPlugin {
             add_action('deactivated_plugin', array(&$this, 'stacksightDeactivatedPlugin'), 10, 2);
             add_action('updated_option', array(&$this, 'action_updated_option'), 100, 3);
             add_action('wpmu_new_blog', array(&$this, 'stacksightAddNewBlog'), 10, 6);
+        }
 
-            if(is_admin()) {
-                add_action('admin_menu', array($this, 'add_plugin_page'));
-                add_action('admin_init', array($this, 'page_init'));
-                add_action('admin_notices', array($this, 'show_errors'));
-                add_filter('plugin_action_links_' . plugin_basename(__FILE__), array($this, 'stacksight_plugin_action_links'));
-            }
+        if(is_admin()) {
+            add_action('admin_menu', array($this, 'add_plugin_page'));
+            add_action('admin_init', array($this, 'page_init'));
+            add_action('admin_notices', array($this, 'show_errors'));
+            add_filter('plugin_action_links_' . plugin_basename(__FILE__), array($this, 'stacksight_plugin_action_links'));
         }
     }
 
@@ -719,7 +720,7 @@ class WPStackSightPlugin {
             <h2>App setting for StackSight</h2>
             <!-- Create a header in the default WordPress 'wrap' container -->
             <div class="wrap">
-                <?php settings_errors(); ?>
+                <?php //settings_errors(); ?>
                 <h2 class="nav-tab-wrapper">
                     <a href="?page=stacksight&tab=general_settings" class="nav-tab <?php echo $active_tab == 'general_settings' ? 'nav-tab-active' : ''; ?>">General settings</a>
                     <a href="?page=stacksight&tab=features_settings" class="nav-tab <?php echo $active_tab == 'features_settings' ? 'nav-tab-active' : ''; ?>">Features</a>
@@ -1321,6 +1322,7 @@ class WPStackSightPlugin {
         if(!defined('STACKSIGHT_TOKEN')) add_settings_error('token', 'token', '"App Acces Token" can not be empty');
 
         $any_errors = $this->any_form_errors();
+        if($any_errors)  $this->show_errors();
 
         if(defined('STACKSIGHT_SETTINGS_IN_DB') && STACKSIGHT_SETTINGS_IN_DB === true){
             $new_input['_id'] = $input['_id'];
@@ -1338,6 +1340,7 @@ class WPStackSightPlugin {
     {
         $new_input = array();
         $any_errors = $this->any_form_errors();
+        if($any_errors)  $this->show_errors();
         $new_input['include_logs'] = (isset($input['include_logs']) && $input['include_logs'] == 'on') ? true : false;
         $new_input['include_health'] = (isset($input['include_health']) && $input['include_health'] == 'on') ? true : false;
         $new_input['include_inventory'] = (isset($input['include_inventory']) && $input['include_inventory'] == 'on') ? true : false;
@@ -1354,6 +1357,7 @@ class WPStackSightPlugin {
         if(!$input['slack_url']) add_settings_error('slack_url', 'slack_url', '"Webhook incoming URL" can not be empty');
 
         $any_errors = $this->any_form_errors();
+        if($any_errors)  $this->show_errors();
 
         $new_input['slack_url'] = $input['slack_url'];
         $new_input['enable_slack_notify_logs'] = (isset($input['enable_slack_notify_logs']) && $input['enable_slack_notify_logs'] == 'on') ? true : false;
@@ -1776,4 +1780,5 @@ class WPStackSightPlugin {
     }
 
 }
+
 $ss_client_plugin = new WPStackSightPlugin();
