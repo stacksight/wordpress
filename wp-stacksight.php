@@ -33,6 +33,7 @@ class WPStackSightPlugin {
     const STACKSIGHT_UPDATES_QUEUE = 'stacksight_updates_queue';
     const STACKSIGHT_INVENTORY_QUEUE = 'stacksight_inventory_queue';
     const STACKSIGHT_HEALTH_QUEUE = 'stacksight_health_queue';
+    const STACKSIGHT_HANDSHAKE_QUEUE = 'stacksight_handshake_queue';
 
     const STACKISGHT_PATH = 'stacksight/wp-stacksight.php';
 //    const STACKISGHT_PATH = 'wp-super-cache/wp-cache.php';
@@ -127,24 +128,27 @@ class WPStackSightPlugin {
 
     public function stacksightActivatedPlugin($plugin_name, $network_wide)
     {
+        $this->addToQueue(self::STACKSIGHT_HANDSHAKE_QUEUE);
         $this->sendInventory($plugin_name, true, false, self::ACTION_ACTIVATE_DEACTIVATE, $network_wide);
-        $this->handshake(true);
+        $this->sendHandshake(true);
         $this->ss_client->sendMultiCURL();
     }
 
     public function stacksightDeactivatedPlugin($plugin_name, $network_wide)
     {
+        $this->addToQueue(self::STACKSIGHT_HANDSHAKE_QUEUE);
         $this->sendInventory($plugin_name, true, false, self::ACTION_ACTIVATE_DEACTIVATE, $network_wide);
-        $this->handshake(true);
+        $this->sendHandshake(true);
         $this->ss_client->sendMultiCURL();
     }
 
     public function stacksightPluginInstallUpdate($upgrader, $extra)
     {
+        $this->addToQueue(self::STACKSIGHT_HANDSHAKE_QUEUE);
         $this->addToQueue(self::STACKSIGHT_UPDATES_QUEUE);
         $this->sendInventory(false, true, false, self::ACTION_INSTALL_UPDATES, true, true, $upgrader, $extra);
         $this->sendUpdates(true, $upgrader, $extra);
-        $this->handshake(true);
+        $this->sendHandshake(true);
         $this->installUpdateStacksight($upgrader, $extra);
         $this->ss_client->sendMultiCURL();
     }
@@ -165,10 +169,11 @@ class WPStackSightPlugin {
 
     public function stacksightPluginDelete($plugin_name)
     {
+        $this->addToQueue(self::STACKSIGHT_HANDSHAKE_QUEUE);
         $this->addToQueue(self::STACKSIGHT_UPDATES_QUEUE);
         $this->sendInventory($plugin_name, true, false, self::ACTION_REMOVE, true, true);
         $this->sendUpdates(true);
-        $this->handshake(true);
+        $this->sendHandshake(true);
         $this->ss_client->sendMultiCURL();
     }
 
@@ -349,7 +354,7 @@ class WPStackSightPlugin {
 
         SSUtilities::error_log('cron_do_main_job has been run', 'cron_log');
 
-        $this->handshake(true, $host);
+        $this->sendHandShake(true, $host);
         // updates
         $this->sendUpdates(true, false, false, $host);
 
@@ -389,6 +394,31 @@ class WPStackSightPlugin {
     function is_blog_plugin_active($plugin, $blog_id)
     {
         return in_array($plugin, (array) get_blog_option($blog_id, 'active_plugins', array())) || is_plugin_active_for_network( $plugin );
+    }
+
+    public function sendHandshake($isMulticurl = true, $host = false){
+        if(is_multisite()){
+            $queue_json = get_option(self::STACKSIGHT_HANDSHAKE_QUEUE);
+            if($queue_json){
+                $queue = json_decode($queue_json);
+            }
+            if(isset($queue) && sizeof($queue) > 0){
+                $blogs_array = $queue;
+                $slice_size = (defined('STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST')) ? STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST : self::MULTI_SENDS_UPDATES_PER_REQUEST;
+                $blogs = array_slice($blogs_array, 0 , $slice_size);
+                if(sizeof($blogs) > 0){
+                    foreach($blogs as $blog){
+                        $this->handshake($isMulticurl, $blog);
+                    }
+                    $this->sliceQueue(self::STACKSIGHT_HANDSHAKE_QUEUE);
+                }
+                $this->handshake($isMulticurl, $host);
+            } else{
+                $this->handshake($isMulticurl, $host);
+            }
+        } else{
+            $this->handshake($isMulticurl, $host);
+        }
     }
 
     public function sendUpdates($multiCurl = true, $upgrader = false, $extra = false, $host = false)
