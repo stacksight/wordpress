@@ -3,7 +3,7 @@
  * Plugin Name: Stacksight
  * Plugin URI: https://wordpress.org/plugins/stacksight/
  * Description: Stacksight wordpress support (featuring events, error logs and updates)
- * Version: 1.9.4
+ * Version: 1.10.0
  * Author: Stacksight LTD
  * Author URI: http://stacksight.io
  * License: GPL
@@ -15,6 +15,7 @@ require_once('stacksight-php-sdk/SSUtilities.php');
 require_once('stacksight-php-sdk/SSClientBase.php');
 require_once('stacksight-php-sdk/SSHttpRequest.php');
 require_once('stacksight-php-sdk/platforms/SSWordpressClient.php');
+include_once(ABSPATH.'wp-admin/includes/plugin.php');
 
 class WPStackSightPlugin {
 
@@ -25,6 +26,20 @@ class WPStackSightPlugin {
     private $health;
     private $dep_plugins = array();
 
+    const ACTION_ACTIVATE_DEACTIVATE = 'action_activate_deactivate';
+    const ACTION_REMOVE = 'action_remove';
+    const ACTION_INSTALL_UPDATES = 'action_install_updates';
+
+    const STACKSIGHT_UPDATES_QUEUE = 'stacksight_updates_queue';
+    const STACKSIGHT_INVENTORY_QUEUE = 'stacksight_inventory_queue';
+    const STACKSIGHT_HEALTH_QUEUE = 'stacksight_health_queue';
+    const STACKSIGHT_HANDSHAKE_QUEUE = 'stacksight_handshake_queue';
+
+    const STACKISGHT_PATH = 'stacksight/wp-stacksight.php';
+//    const STACKISGHT_PATH = 'wp-super-cache/wp-cache.php';
+
+    const MULTI_SENDS_UPDATES_PER_REQUEST = 10;
+
     public $defaultDefines = array(
         'STACKSIGHT_INCLUDE_LOGS' => false,
         'STACKSIGHT_INCLUDE_HEALTH' => true,
@@ -33,18 +48,22 @@ class WPStackSightPlugin {
         'STACKSIGHT_INCLUDE_UPDATES' => true
     );
 
-    public function __construct() {
+    public function __construct()
+    {
         register_activation_hook( __FILE__, array(__CLASS__, 'install'));
         register_deactivation_hook( __FILE__, array(__CLASS__, 'uninstall'));
 
-        if(is_admin()) {
-            add_action('admin_menu', array($this, 'add_plugin_page'));
-            add_action('admin_init', array($this, 'page_init'));
-            add_action('admin_notices', array($this, 'show_errors'));
-            add_filter( 'plugin_action_links_' . plugin_basename(__FILE__), array($this, 'stacksight_plugin_action_links'));
-        }
-
         $this->_setUpMultidomainsConfig(array('STACKSIGHT_APP_ID', 'STACKSIGHT_TOKEN', 'STACKSIGHT_GROUP'));
+
+        if(file_exists(ABSPATH .'wp-content/plugins/aryo-activity-log/aryo-activity-log.php')){
+            if(is_plugin_active('aryo-activity-log/aryo-activity-log.php')){
+                define('STACKSIGHT_ACTIVE_AAL', true);
+            } else{
+                define('STACKSIGHT_ACTIVE_AAL', false);
+            }
+        } else{
+            define('STACKSIGHT_ACTIVE_AAL', false);
+        }
 
         if (defined('STACKSIGHT_TOKEN') && defined('STACKSIGHT_BOOTSTRAPED')) {
             $app_id = (defined('STACKSIGHT_APP_ID')) ?  STACKSIGHT_APP_ID : false;
@@ -60,12 +79,106 @@ class WPStackSightPlugin {
                     add_action('aal_insert_log', array(&$this, 'insert_log_mean'), 30);
                 }
             }
+            
             add_action('stacksight_main_action', array($this, 'cron_do_main_job'));
+
+            add_action('upgrader_process_complete', array( &$this, 'stacksightPluginInstallUpdate' ), 10, 2);
+            add_action('delete_plugin', array( &$this, 'stacksightPluginDelete' ), 10, 1);
+            add_action('activate_plugin', array(&$this, 'stacksightActivatedPlugin'), 10, 2);
+            add_action('deactivated_plugin', array(&$this, 'stacksightDeactivatedPlugin'), 10, 2);
+            add_action('updated_option', array(&$this, 'action_updated_option'), 100, 3);
+            add_action('wpmu_new_blog', array(&$this, 'stacksightAddNewBlog'), 10, 6);
+        }
+
+        if(is_admin()) {
+            add_action('admin_menu', array($this, 'add_plugin_page'));
+            add_action('admin_init', array($this, 'page_init'));
+            add_action('admin_notices', array($this, 'show_errors'));
+            add_filter('plugin_action_links_' . plugin_basename(__FILE__), array($this, 'stacksight_plugin_action_links'));
         }
     }
 
-    public function showStackMessages(){
-        SSUtilities::checkPermissions();
+    public function stacksightAddNewBlog($blog_id, $user_id, $domain, $path, $site_id, $meta)
+    {
+	    $this->cron_do_main_job($domain);
+        $this->sendInventory(false, true, $domain);
+        $this->ss_client->sendMultiCURL();
+    }
+
+    public function action_updated_option($option, $old_value, $value)
+    {
+        //$this->handshake();
+    }
+
+    private function sendInventory($plugin_name = false, $multicurl = true, $host = false, $action = false, $network_wide = false, $for_all_subdomain = false, $upgrader = false, $extra = false)
+    {
+        if (is_multisite() && $for_all_subdomain) {
+            $this->addToQueue(self::STACKSIGHT_INVENTORY_QUEUE);
+            $this->sendInventories($plugin_name, $action, $multicurl, $upgrader, $extra);
+        } else {
+            $inventory = $this->getInventory($plugin_name, $action);
+            if (!empty($inventory)) {
+                $data = array(
+                    'data' => $inventory
+                );
+                $this->ss_client->sendInventory($data, $multicurl, $host);
+            }
+        }
+    }
+
+    public function stacksightActivatedPlugin($plugin_name, $network_wide)
+    {
+        $this->addToQueue(self::STACKSIGHT_HANDSHAKE_QUEUE);
+        $this->sendInventory($plugin_name, true, false, self::ACTION_ACTIVATE_DEACTIVATE, $network_wide);
+        $this->sendHandshake(true);
+        $this->ss_client->sendMultiCURL();
+    }
+
+    public function stacksightDeactivatedPlugin($plugin_name, $network_wide)
+    {
+        $this->addToQueue(self::STACKSIGHT_HANDSHAKE_QUEUE);
+        $this->sendInventory($plugin_name, true, false, self::ACTION_ACTIVATE_DEACTIVATE, $network_wide);
+        $this->sendHandshake(true);
+        $this->ss_client->sendMultiCURL();
+    }
+
+    public function stacksightPluginInstallUpdate($upgrader, $extra)
+    {
+        $this->addToQueue(self::STACKSIGHT_HANDSHAKE_QUEUE);
+        $this->addToQueue(self::STACKSIGHT_UPDATES_QUEUE);
+        $this->sendInventory(false, true, false, self::ACTION_INSTALL_UPDATES, true, true, $upgrader, $extra);
+        $this->sendUpdates(true, $upgrader, $extra);
+        $this->sendHandshake(true);
+        $this->installUpdateStacksight($upgrader, $extra);
+        $this->ss_client->sendMultiCURL();
+    }
+
+    public function installUpdateStacksight($upgrader, $extra)
+    {
+        if($upgrader && $extra){
+            if ($extra['action'] == 'update' || $extra['action'] == 'install') {
+                $path = $upgrader->plugin_info();
+                if($path == self::STACKISGHT_PATH){
+                    $this->addToQueue(self::STACKSIGHT_HEALTH_QUEUE);
+                    $health = $this->getHealthData();
+                    $this->sendHealthToStacksight($health, true);
+                }
+            }
+        }
+    }
+
+    public function stacksightPluginDelete($plugin_name)
+    {
+        $this->addToQueue(self::STACKSIGHT_HANDSHAKE_QUEUE);
+        $this->addToQueue(self::STACKSIGHT_UPDATES_QUEUE);
+        $this->sendInventory($plugin_name, true, false, self::ACTION_REMOVE, true, true);
+        $this->sendUpdates(true);
+        $this->sendHandshake(true);
+        $this->ss_client->sendMultiCURL();
+    }
+
+    public function showStackMessages()
+    {
         if(isset($_SESSION['STACKSIGHT_MESSAGE']) && !empty($_SESSION['STACKSIGHT_MESSAGE']) && is_array($_SESSION['STACKSIGHT_MESSAGE'])){
             foreach($_SESSION['STACKSIGHT_MESSAGE'] as $message){
                 add_settings_error('', '', $message);
@@ -73,7 +186,8 @@ class WPStackSightPlugin {
         }
     }
 
-    private function _setUpMultidomainsConfig($params = array()){
+    private function _setUpMultidomainsConfig($params = array())
+    {
         if($params && is_array($params)){
             foreach($params as $param){
                 if (is_multisite()) {
@@ -87,12 +201,14 @@ class WPStackSightPlugin {
         }
     }
 
-    public function stacksight_plugin_action_links( $links ) {
+    public function stacksight_plugin_action_links( $links )
+    {
         $links[] = '<a href="'. esc_url( get_admin_url(null, 'options-general.php?page=stacksight') ) .'">'.__('Settings').'</a>';
         return $links;
     }
 
-    public function cron_custom_interval($schedules) {
+    public function cron_custom_interval($schedules)
+    {
         $this->options = get_option('stacksight_opt');
         $interval = isset($this->options['cron_updates_interval']) ? (int)$this->options['cron_updates_interval'] : 86400; // default dayli
 
@@ -104,14 +220,14 @@ class WPStackSightPlugin {
         return $schedules;
     }
 
-    public function handshake(){
-        $total_state = $this->getTotalState();
+    public function handshake($multiCurl = false, $host = false)
+    {
+        $total_state = $this->getTotalState($host);
         $total_hash_state = md5(serialize($total_state));
         $old_hash_exist = false;
         $old_hash_state = false;
         $date_of_old_hash_state = false;
         $state_option = false;
-
 
         if($state_option = get_option('stacksight_state')){
             $tempory = unserialize($state_option);
@@ -119,7 +235,6 @@ class WPStackSightPlugin {
             $old_hash_state = $tempory['hash_of_state'];
             $date_of_old_hash_state = $tempory['date_of_set'];
         }
-
         // If we have changed state
         if($total_hash_state != $old_hash_state){
             $time = time();
@@ -142,107 +257,245 @@ class WPStackSightPlugin {
             } else{
                 add_option('stacksight_state', serialize($new_state_to_db));
             }
-
-            $this->ss_client->publishEvent($handshake_event, true);
+            $this->ss_client->publishEvent($handshake_event, $multiCurl, $host);
         }
     }
 
-    public function cron_do_main_job() {
+    public function getHealthData(){
+        $health = array();
+        // health, include health security class if All in One Security plugin exists
+        $all_in_one_dir = WP_PLUGIN_DIR.'/all-in-one-wp-security-and-firewall';
+        if (is_file($all_in_one_dir.'/wp-security-core.php')) {
+            require_once($all_in_one_dir.'/wp-security-core.php');
+            require_once($all_in_one_dir.'/admin/wp-security-admin-init.php');
+            require_once('inc/wp-health-security.php');
+
+            $active = is_plugin_active('all-in-one-wp-security-and-firewall/wp-security.php');
+            if($active === true){
+                if(!$this->health)
+                    $this->health = new stdClass;
+
+                $this->health->security = new WPHealthSecurity();
+                $health['data'][] = $this->getSecurityData();
+            }
+        }
+
+        $seo_dir = WP_PLUGIN_DIR.'/wordpress-seo';
+        if (is_file($seo_dir.'/wp-seo-main.php')) {
+            require_once('inc/wp-health-seo.php');
+
+            $active = is_plugin_active('wordpress-seo/wp-seo.php');
+            if($active === true){
+                if(!$this->health)
+                    $this->health = new stdClass;
+
+                $this->health->seo = new WPHealthSeo();
+                if(!isset($health))
+                    $health = array();
+
+                if($seo_data = $this->getSeoData())
+                    $health['data'][] = $seo_data;
+            }
+        }
+
+        $backups_dir = WP_PLUGIN_DIR . '/updraftplus';
+        if (is_file($backups_dir . '/updraftplus.php')) {
+            if(!defined('UPDRAFTPLUS_DIR'))
+                define('UPDRAFTPLUS_DIR', true);
+            require_once('inc/wp-health-backups.php');
+            require_once($backups_dir . '/restorer.php');
+            require_once($backups_dir . '/options.php');
+
+            $active = is_plugin_active('updraftplus/updraftplus.php');
+            if($active === true){
+                if (!$this->health)
+                    $this->health = new stdClass;
+
+                $this->health->backups = new WPHealthBackups();
+                if (!isset($health))
+                    $health = array();
+
+                if ($backups_data = $this->getBackupsData())
+                    $health['data'][] = $backups_data;
+            }
+        }
+
+        if(isset($health['data']) && !empty($health['data'])){
+            return $health;
+        } else{
+            return false;
+        }
+    }
+
+    public function sendHealthToStacksight($health, $multisite = false, $host = false){
+        if(isset($health['data']) && !empty($health['data'])){
+            $this->ss_client->sendHealth($health, $multisite, $host);
+        }
+
+        $queue = get_option(self::STACKSIGHT_HEALTH_QUEUE);
+
+        if($queue){
+            $blogs_array = json_decode($queue);
+            $slice_size = (defined('STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST')) ? STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST : self::MULTI_SENDS_UPDATES_PER_REQUEST;
+            $blogs = array_slice($blogs_array, 0 , $slice_size);
+            if(sizeof($blogs) > 0){
+                foreach($blogs as $blog){
+                    $this->ss_client->sendHealth($health, $multisite, $blog);
+                }
+            }
+            $this->sliceQueue(self::STACKSIGHT_HEALTH_QUEUE);
+        }
+    }
+
+    public function cron_do_main_job($host = false)
+    {
         if(!defined('STACKSIGHT_TOKEN') || !isset($this->ss_client) || !$this->ss_client)
             return;
 
         SSUtilities::error_log('cron_do_main_job has been run', 'cron_log');
 
-        $this->handshake();
-
+        $this->sendHandShake(true, $host);
         // updates
-        if(defined('STACKSIGHT_INCLUDE_UPDATES') && STACKSIGHT_INCLUDE_UPDATES == true){
-            $updates = array(
-                'data' => $this->get_update_info()
-            );
-            $this->ss_client->sendUpdates($updates, true);
-        }
-
-        $health = array();
+        $this->sendUpdates(true, false, false, $host);
 
         if(defined('STACKSIGHT_INCLUDE_HEALTH') && STACKSIGHT_INCLUDE_HEALTH == true){
-            // health, include health security class if All in One Security plugin exists
-            $all_in_one_dir = WP_PLUGIN_DIR.'/all-in-one-wp-security-and-firewall';
-            if (is_file($all_in_one_dir.'/wp-security-core.php')) {
-                require_once($all_in_one_dir.'/wp-security-core.php');
-                require_once($all_in_one_dir.'/admin/wp-security-admin-init.php');
-                require_once('inc/wp-health-security.php');
-
-                $active = is_plugin_active('all-in-one-wp-security-and-firewall/wp-security.php');
-                if($active === true){
-                    if(!$this->health)
-                        $this->health = new stdClass;
-
-                    $this->health->security = new WPHealthSecurity();
-                    $health['data'][] = $this->getSecurityData();
-                }
-            }
-
-            $seo_dir = WP_PLUGIN_DIR.'/wordpress-seo';
-            if (is_file($seo_dir.'/wp-seo-main.php')) {
-                require_once('inc/wp-health-seo.php');
-
-                $active = is_plugin_active('wordpress-seo/wp-seo.php');
-                if($active === true){
-                    if(!$this->health)
-                        $this->health = new stdClass;
-
-                    $this->health->seo = new WPHealthSeo();
-                    if(!isset($health))
-                        $health = array();
-
-                    if($seo_data = $this->getSeoData())
-                        $health['data'][] = $seo_data;
-                }
-            }
-
-            $backups_dir = WP_PLUGIN_DIR . '/updraftplus';
-            if (is_file($backups_dir . '/updraftplus.php')) {
-                if(!defined('UPDRAFTPLUS_DIR'))
-                    define('UPDRAFTPLUS_DIR', true);
-                require_once('inc/wp-health-backups.php');
-                require_once($backups_dir . '/restorer.php');
-                require_once($backups_dir . '/options.php');
-
-                $active = is_plugin_active('updraftplus/updraftplus.php');
-                if($active === true){
-                    if (!$this->health)
-                        $this->health = new stdClass;
-
-                    $this->health->backups = new WPHealthBackups();
-                    if (!isset($health))
-                        $health = array();
-
-                    if ($backups_data = $this->getBackupsData())
-                        $health['data'][] = $backups_data;
-                }
-            }
-
-            if(isset($health['data']) && !empty($health['data'])){
-                $this->ss_client->sendHealth($health, true);
-            }
+            $health = $this->getHealthData();
+            $this->sendHealthToStacksight($health, true, $host);
         }
 
         if(defined('STACKSIGHT_INCLUDE_INVENTORY') && STACKSIGHT_INCLUDE_INVENTORY == true){
-            $inventory = $this->getInventory();
-            if(!empty($inventory)){
-                $data = array(
-                    'data' => $inventory
-                );
-                $this->ss_client->sendInventory($data, true);
-            }
+            $this->sendInventories();
         }
 
         $this->ss_client->sendMultiCURL();
     }
 
-    public function insert_log_mean($args) {
-        if(defined('STACKSIGHT_INCLUDE_EVENTS') && STACKSIGHT_INCLUDE_EVENTS == true){
+    function getBlogOption($host, $param, $default_param = false)
+    {
+        global $wpdb;
+        $sql = $wpdb->prepare("SELECT blog_id, domain, path FROM $wpdb->blogs WHERE archived='0' AND deleted ='0'", '');
+        $blogs = $wpdb->get_results($sql);
+        if($blogs){
+            $is_result = false;
+            foreach($blogs as $blog){
+                if($blog->domain == $host){
+                    $is_result == true;
+                    return get_blog_option($blog->blog_id, $param, $default_param);
+                }
+            }
+            if($is_result === false){
+                return $default_param;
+            }
+        } else{
+            return $default_param;
+        }
+    }
+
+    function is_blog_plugin_active($plugin, $blog_id)
+    {
+        return in_array($plugin, (array) get_blog_option($blog_id, 'active_plugins', array())) || is_plugin_active_for_network( $plugin );
+    }
+
+    public function sendHandshake($isMulticurl = true, $host = false){
+        if(is_multisite()){
+            $queue_json = get_option(self::STACKSIGHT_HANDSHAKE_QUEUE);
+            if($queue_json){
+                $queue = json_decode($queue_json);
+            }
+            if(isset($queue) && sizeof($queue) > 0){
+                $blogs_array = $queue;
+                $slice_size = (defined('STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST')) ? STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST : self::MULTI_SENDS_UPDATES_PER_REQUEST;
+                $blogs = array_slice($blogs_array, 0 , $slice_size);
+                if(sizeof($blogs) > 0){
+                    foreach($blogs as $blog){
+                        $this->handshake($isMulticurl, $blog);
+                    }
+                    $this->sliceQueue(self::STACKSIGHT_HANDSHAKE_QUEUE);
+                }
+                $this->handshake($isMulticurl, $host);
+            } else{
+                $this->handshake($isMulticurl, $host);
+            }
+        } else{
+            $this->handshake($isMulticurl, $host);
+        }
+    }
+
+    public function sendUpdates($multiCurl = true, $upgrader = false, $extra = false, $host = false)
+    {
+        if(defined('STACKSIGHT_INCLUDE_UPDATES') && STACKSIGHT_INCLUDE_UPDATES == true){
+            $updates = array(
+                'data' => $this->get_update_info($upgrader, $extra)
+            );
+            if(is_multisite()){
+                $queue_json = get_option(self::STACKSIGHT_UPDATES_QUEUE);
+                if($queue_json){
+                    $queue = json_decode($queue_json);
+                }
+                if(isset($queue) && sizeof($queue) > 0){
+                    $blogs_array = $queue;
+                    $slice_size = (defined('STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST')) ? STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST : self::MULTI_SENDS_UPDATES_PER_REQUEST;
+                    $blogs = array_slice($blogs_array, 0 , $slice_size);
+                    if(sizeof($blogs) > 0){
+                        foreach($blogs as $blog){
+                            $this->ss_client->sendUpdates($updates, $multiCurl, $blog);
+                        }
+                        $this->sliceQueue(self::STACKSIGHT_UPDATES_QUEUE);
+                    }
+                    $this->ss_client->sendUpdates($updates, true, $host);
+                } else{
+                    $this->ss_client->sendUpdates($updates, true, $host);
+                }
+            } else{
+                $this->ss_client->sendUpdates($updates, true, $host);
+            }
+        }
+    }
+
+    public function sliceQueue($param)
+    {
+        if(is_multisite()){
+            $queue = get_option($param);
+            if($queue){
+                $blogs_array = json_decode($queue);
+                $slice_size = (defined('STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST')) ? STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST : self::MULTI_SENDS_UPDATES_PER_REQUEST;
+                $blogs = array_slice($blogs_array, 0 , $slice_size);
+                if(sizeof($blogs) > 0){
+                    $blog_surplus = array_slice($blogs_array, $slice_size);
+                    if($blog_surplus && sizeof(($blog_surplus) > 0)){
+                        update_option($param, json_encode($blog_surplus));
+                    } else{
+                        update_option($param, json_encode(array()));
+                    }
+                }
+            }
+        }
+    }
+
+    private function addToQueue($param)
+    {
+        global $wpdb;
+        $sql = $wpdb->prepare("SELECT blog_id, domain, path FROM $wpdb->blogs WHERE archived='0' AND deleted ='0'", '');
+        $blogs = $wpdb->get_results($sql);
+        if($blogs){
+            $blogs_array = array();
+            foreach($blogs as $blog) {
+                $blogs_array[] = $blog->domain;
+            }
+
+            $param_db = get_option($param);
+
+            if($param_db){
+                update_option($param, json_encode($blogs_array));
+            } else{
+                add_option($param, json_encode($blogs_array));
+            }
+        }
+    }
+
+    public function insert_log_mean($args)
+    {
+        if(defined('STACKSIGHT_INCLUDE_EVENTS') && STACKSIGHT_INCLUDE_EVENTS == true && defined('STACKSIGHT_ACTIVE_AAL') && STACKSIGHT_ACTIVE_AAL === true){
             $event = array();
             if (is_user_logged_in()) {
                 $user = wp_get_current_user();
@@ -330,12 +583,9 @@ class WPStackSightPlugin {
             }
 
             $res = $this->ss_client->publishEvent($event);
-
             if($ready_show_debug === true){
-                if(SSUtilities::checkPermissions()){
-                    if(isset($_SESSION['stacksight_debug']['events']) && !empty($_SESSION['stacksight_debug']['events'])){
-                        SSUtilities::error_log(print_r($_SESSION['stacksight_debug']['events'], true), 'debug_events', true);
-                    }
+                if(isset($_SESSION['stacksight_debug']['events']) && !empty($_SESSION['stacksight_debug']['events'])){
+                    SSUtilities::error_log(print_r($_SESSION['stacksight_debug']['events'], true), 'debug_events', true);
                 }
             }
             if (!$res['success']) SSUtilities::error_log($res['message'], 'error');
@@ -345,7 +595,8 @@ class WPStackSightPlugin {
     /**
      * Add options page
      */
-    public function add_plugin_page() {
+    public function add_plugin_page()
+    {
         add_menu_page(
             'StackSight Integration',
             'StackSight',
@@ -357,7 +608,61 @@ class WPStackSightPlugin {
         );
     }
 
-    public function getInventory(){
+    public function sendInventories($plugin_name = false, $action = false, $multicurl = false, $upgrader = false, $extra = false)
+    {
+        global $wpdb;
+        $updated = false;
+        if($upgrader && $extra){
+            if ($extra['action'] == 'update') {
+                $path = $upgrader->plugin_info();
+                $updated = get_plugin_data( $upgrader->skin->result['local_destination'] . '/' . $path, true, false );
+            }
+        }
+
+        if(is_multisite()){
+            $queue = get_option(self::STACKSIGHT_INVENTORY_QUEUE);
+            if($queue){
+                $blogs_array = json_decode($queue);
+                $slice_size = (defined('STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST')) ? STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST : self::MULTI_SENDS_UPDATES_PER_REQUEST;
+                $blogs = array_slice($blogs_array, 0 , $slice_size);
+                if(sizeof($blogs) > 0){
+                    $sql = $wpdb->prepare("SELECT blog_id, domain, path FROM $wpdb->blogs WHERE archived='0' AND deleted ='0'", '');
+                    $blogs_db = $wpdb->get_results($sql);
+                    if($blogs_db){
+                        $blogs_assoc_array = array();
+                        foreach($blogs_db as $blog) {
+                            $blogs_assoc_array[$blog->domain] = $blog->blog_id;
+                        }
+                    }
+                    foreach($blogs as $blog){
+                        if(isset($blogs_assoc_array[$blog])){
+                            $blog_id = $blogs_assoc_array[$blog];
+                        } else{
+                            $blog_id = false;
+                        }
+                        $inventory =  $this->getInventory($plugin_name, $action, $blog_id, $updated);
+                        if (!empty($inventory)) {
+                            $data = array(
+                                'data' => $inventory
+                            );
+                            $this->ss_client->sendInventory($data, $multicurl, $blog);
+                        }
+                    }
+                    $this->sendInventory($plugin_name, true, false, $action);
+                    $this->sliceQueue(self::STACKSIGHT_INVENTORY_QUEUE);
+                } else{
+                    $this->sendInventory($plugin_name, true, false, $action);
+                }
+            } else{
+                $this->sendInventory($plugin_name, true, false, $action);
+            }
+        } else{
+            $this->sendInventory($plugin_name, true, false, $action);
+        }
+    }
+
+    public function getInventory($plugin_name = false, $action = false, $blog_id = false, $updated = false, $deleted = false)
+    {
         $object_plugins = get_plugins();
         $object_themes = get_themes();
         $plugins = array();
@@ -365,15 +670,51 @@ class WPStackSightPlugin {
 
         if($object_plugins && is_array($object_plugins)){
             foreach($object_plugins as $path => $plugin){
-                $plugins[] = array(
-                    'type' => SSWordpressClient::TYPE_PLUGIN,
-                    'name' => ($plugin['TextDomain']) ? $plugin['TextDomain'] : basename($path),
-                    'version' => $plugin['Version'],
-                    'label' => $plugin['Name'],
-                    'description' => $plugin['Description'],
-                    'active' => (is_plugin_active($path)) ? true : false,
-                    'requires' => array()
-                );
+                $skip = false;
+                if($action){
+                    switch ($action){
+                        case self::ACTION_ACTIVATE_DEACTIVATE:
+                            if($plugin_name && $path == $plugin_name){
+                                if($blog_id){
+                                    $active = (is_blog_plugin_active($path, $blog_id)) ? false : true;
+                                } else{
+                                    $active = (is_plugin_active($path)) ? false : true;
+                                }
+
+                            } else{
+                                if($blog_id){
+                                    $active =  (is_blog_plugin_active($path)) ? true : false;
+                                } else{
+                                    $active =  (is_plugin_active($path)) ? true : false;
+                                }
+                            }
+                            break;
+                        case self::ACTION_REMOVE:
+                            if($plugin_name && $path == $plugin_name){
+                                $skip = true;
+                            }
+                            break;
+                        default:
+                            break;
+                    }
+                }
+
+                if($updated && ($updated['TextDomain'] == $plugin['TextDomain'])){
+                    $version = $updated['Version'];
+                } else{
+                    $version = $plugin['Version'];
+                }
+                if($skip === false){
+                    $plugins[] = array(
+                        'type' => SSWordpressClient::TYPE_PLUGIN,
+                        'name' => ($plugin['TextDomain']) ? $plugin['TextDomain'] : basename($path),
+                        'version' => $version,
+                        'label' => $plugin['Name'],
+                        'description' => $plugin['Description'],
+                        'active' => (isset($active)) ? $active : is_plugin_active($path),
+                        'requires' => array()
+                    );
+                }
             }
         }
 
@@ -398,16 +739,10 @@ class WPStackSightPlugin {
     /**
      * Options page callback
      */
-    public function create_admin_page() {
+    public function create_admin_page()
+    {
         wp_enqueue_style('ss-admin', plugins_url('assets/css/ss-admin.css', __FILE__ ));
         $active_tab = isset( $_GET[ 'tab' ] ) ? $_GET[ 'tab' ] : 'general_settings';
-        if(file_exists(ABSPATH .'wp-content/plugins/aryo-activity-log/aryo-activity-log.php')){
-            if(is_plugin_active('aryo-activity-log/aryo-activity-log.php')){
-                define('STACKSIGHT_ACTIVE_AAL', true);
-            } else{
-                define('STACKSIGHT_ACTIVE_AAL', false);
-            }
-        }
         require_once('texts.php');
         $this->showStackMessages();
         ?>
@@ -415,7 +750,7 @@ class WPStackSightPlugin {
             <h2>App setting for StackSight</h2>
             <!-- Create a header in the default WordPress 'wrap' container -->
             <div class="wrap">
-                <?php settings_errors(); ?>
+                <?php //settings_errors(); ?>
                 <h2 class="nav-tab-wrapper">
                     <a href="?page=stacksight&tab=general_settings" class="nav-tab <?php echo $active_tab == 'general_settings' ? 'nav-tab-active' : ''; ?>">General settings</a>
                     <a href="?page=stacksight&tab=features_settings" class="nav-tab <?php echo $active_tab == 'features_settings' ? 'nav-tab-active' : ''; ?>">Features</a>
@@ -453,7 +788,8 @@ class WPStackSightPlugin {
         <?php
     }
 
-    private function showDebugInfo(){
+    private function showDebugInfo()
+    {
         if(isset($_SESSION['stacksight_debug']) && !empty($_SESSION['stacksight_debug']) && is_array($_SESSION['stacksight_debug'])){
             foreach($_SESSION['stacksight_debug'] as $key => $feature):?>
                 <div class="feature-block">
@@ -615,7 +951,8 @@ class WPStackSightPlugin {
         }
     }
 
-    public function getBackupsData() {
+    public function getBackupsData()
+    {
         if (empty($this->health)) return;
 
         $returned = false;
@@ -647,7 +984,8 @@ class WPStackSightPlugin {
 
     }
 
-    public function getSeoData() {
+    public function getSeoData()
+    {
         if (empty($this->health)) return;
 
         $returned = false;
@@ -701,7 +1039,8 @@ class WPStackSightPlugin {
         } else return false;
     }
 
-    public function getSecurityData() {
+    public function getSecurityData()
+    {
         if (empty($this->health)) return;
 
         $data = array(
@@ -754,7 +1093,8 @@ class WPStackSightPlugin {
         return $data;
     }
 
-    public function get_update_info() {
+    public function get_update_info($upgrader = false, $extra = false)
+    {
         require_once(ABSPATH.'wp-admin/includes/update.php');
         if ( ! function_exists( 'get_plugins' ) ) {
             require_once ABSPATH . 'wp-admin/includes/plugin.php';
@@ -764,11 +1104,25 @@ class WPStackSightPlugin {
         $thm_upd = get_theme_updates();
         $core_upd = get_core_updates();
 
+        if($upgrader && $extra){
+            if ($extra['action'] == 'update') {
+                $path = $upgrader->plugin_info();
+                $updated = get_plugin_data( $upgrader->skin->result['local_destination'] . '/' . $path, true, false );
+            }
+        }
+
         foreach ($plg_upd as $key => $uitem) {
+
+            if(isset($updated) && ($updated['TextDomain'] == $uitem->TextDomain)){
+                $version = $updated['Version'];
+            } else{
+                $version = $uitem->Version;
+            }
+
             $upd[] = array(
                 'title' => $uitem->Name,
                 // 'release_ts' => $uitem['datestamp'],
-                'current_version' => $uitem->Version,
+                'current_version' => $version,
                 'latest_version' => $uitem->update->new_version,
                 'type' => 'plugin',
                 'status' => 5, // 5 means new update is available
@@ -781,10 +1135,16 @@ class WPStackSightPlugin {
         }
 
         foreach ($thm_upd as $theme => $uitem) {
+            if(isset($updated) && ($updated['TextDomain'] == $uitem->display('TextDomain'))){
+                $version = $uitem->display('Version');
+            } else{
+                $version = $uitem->Version;
+            }
+
             $upd[] = array(
                 'title' => $uitem->display('Name'),
                 // 'release_ts' => $uitem['datestamp'],
-                'current_version' => $uitem->display('Version'),
+                'current_version' => $version,
                 'latest_version' => $uitem->update['new_version'],
                 'type' => 'theme',
                 'status' => 5, // 5 means new update is available
@@ -820,18 +1180,19 @@ class WPStackSightPlugin {
     /**
      * Register and add settings
      */
-    public function page_init() {
+    public function page_init()
+    {
         register_setting(
             'stacksight_option_group', // Option group
             'stacksight_opt', // Option name
             array( $this, 'sanitize' ) // Sanitize
         );
 
-        register_setting(
-            'stacksight_option_slack', // Option group
-            'stacksight_opt_slack', // Option name
-            array( $this, 'slackSanitize' ) // Sanitize
-        );
+//        register_setting(
+//            'stacksight_option_slack', // Option group
+//            'stacksight_opt_slack', // Option name
+//            array( $this, 'slackSanitize' ) // Sanitize
+//        );
 
         register_setting(
             'stacksight_option_features', // Option group
@@ -984,32 +1345,32 @@ class WPStackSightPlugin {
      *
      * @param array $input Contains all settings fields as array keys
      */
-    public function sanitize($input) {
+    public function sanitize($input)
+    {
         $new_input = array();
 
-//        if(!$input['_id']) add_settings_error('_id', '_id', '"App ID" can not be empty');
-        if(!$input['token']) add_settings_error('token', 'token', '"App Acces Token" can not be empty');
-//        if(!$input['group']) add_settings_error('group', 'group', '"App group" can not be empty');
+        if(!defined('STACKSIGHT_TOKEN')) add_settings_error('token', 'token', '"App Acces Token" can not be empty');
 
         $any_errors = $this->any_form_errors();
+        if($any_errors)  $this->show_errors();
 
         if(defined('STACKSIGHT_SETTINGS_IN_DB') && STACKSIGHT_SETTINGS_IN_DB === true){
             $new_input['_id'] = $input['_id'];
             $new_input['token'] = $input['token'];
             $new_input['group'] = $input['group'];
         }
-        $new_input['enable_options'] = array_keys($input['enable_options']);
         $new_input['cron_updates_interval'] = $input['cron_updates_interval'];
         // schedule the updates action
         wp_clear_scheduled_hook('stacksight_main_action');
         wp_schedule_event(time(), 'updates_interval', 'stacksight_main_action');
-
         return $new_input;
     }
 
-    public function featuresSanitize($input) {
+    public function featuresSanitize($input)
+    {
         $new_input = array();
         $any_errors = $this->any_form_errors();
+        if($any_errors)  $this->show_errors();
         $new_input['include_logs'] = (isset($input['include_logs']) && $input['include_logs'] == 'on') ? true : false;
         $new_input['include_health'] = (isset($input['include_health']) && $input['include_health'] == 'on') ? true : false;
         $new_input['include_inventory'] = (isset($input['include_inventory']) && $input['include_inventory'] == 'on') ? true : false;
@@ -1020,11 +1381,13 @@ class WPStackSightPlugin {
         return $new_input;
     }
 
-    public function slackSanitize($input) {
+    public function slackSanitize($input)
+    {
         $new_input = array();
         if(!$input['slack_url']) add_settings_error('slack_url', 'slack_url', '"Webhook incoming URL" can not be empty');
 
         $any_errors = $this->any_form_errors();
+        if($any_errors)  $this->show_errors();
 
         $new_input['slack_url'] = $input['slack_url'];
         $new_input['enable_slack_notify_logs'] = (isset($input['enable_slack_notify_logs']) && $input['enable_slack_notify_logs'] == 'on') ? true : false;
@@ -1038,7 +1401,8 @@ class WPStackSightPlugin {
      * Get the settings option array and print one of its values
      */
 
-    public function include_logs_callback(){
+    public function include_logs_callback()
+    {
         $checked = '';
         if(defined('STACKSIGHT_INCLUDE_LOGS') && STACKSIGHT_INCLUDE_LOGS === true) {
             $checked = 'checked';
@@ -1050,7 +1414,8 @@ class WPStackSightPlugin {
         printf('<div class="health_features_option"><div class="checkbox"><input type="checkbox" name="stacksight_opt_features[include_logs]" id="enable_features_logs" '.$checked.' /></div>'.$description.'</div>');
     }
 
-    public function include_health_callback(){
+    public function include_health_callback()
+    {
         $checked = '';
         if((defined('STACKSIGHT_INCLUDE_HEALTH') && STACKSIGHT_INCLUDE_HEALTH === true) || !defined('STACKSIGHT_INCLUDE_HEALTH')){
             $checked = 'checked';
@@ -1062,7 +1427,8 @@ class WPStackSightPlugin {
         printf('<div class="health_features_option"><div class="checkbox"><input type="checkbox" name="stacksight_opt_features[include_health]" id="enable_features_health" '.$checked.' /></div>'.$description.'</div>');
     }
 
-    public function include_inventory_callback(){
+    public function include_inventory_callback()
+    {
         $checked = '';
         if((defined('STACKSIGHT_INCLUDE_INVENTORY') && STACKSIGHT_INCLUDE_INVENTORY === true) ||  !defined('STACKSIGHT_INCLUDE_INVENTORY')) {
             $checked = 'checked';
@@ -1074,7 +1440,8 @@ class WPStackSightPlugin {
         printf('<div class="health_features_option"><div class="checkbox"><input type="checkbox" name="stacksight_opt_features[include_inventory]" id="enable_features_inventory" '.$checked.' /></div>'.$description.'</div>');
     }
 
-    public function include_updates_callback(){
+    public function include_updates_callback()
+    {
         $checked = '';
         if((defined('STACKSIGHT_INCLUDE_UPDATES') && STACKSIGHT_INCLUDE_UPDATES === true) || !defined('STACKSIGHT_INCLUDE_UPDATES')){
             $checked = 'checked';
@@ -1086,9 +1453,10 @@ class WPStackSightPlugin {
         printf('<div class="health_features_option"><div class="checkbox"><input type="checkbox" name="stacksight_opt_features[include_updates]" id="enable_features_events" '.$checked.' /></div>'.$description.'</div>');
     }
 
-    public function include_events_callback(){
+    public function include_events_callback()
+    {
         $checked = '';
-        if((defined('STACKSIGHT_INCLUDE_EVENTS') && STACKSIGHT_INCLUDE_EVENTS === true) || !defined('STACKSIGHT_INCLUDE_EVENTS')){
+        if((defined('STACKSIGHT_INCLUDE_EVENTS') && STACKSIGHT_INCLUDE_EVENTS === true && STACKSIGHT_ACTIVE_AAL === true) || !defined('STACKSIGHT_INCLUDE_EVENTS')){
             $checked = 'checked';
         }
         $description = '';
@@ -1104,14 +1472,16 @@ class WPStackSightPlugin {
         }
     }
 
-    public function slack_url_callback() {
+    public function slack_url_callback()
+    {
         printf(
             '<input type="text" id="slack_url" name="stacksight_opt_slack[slack_url]" value="%s" size="50" />',
             isset( $this->options_slack['slack_url'] ) ? esc_attr( $this->options_slack['slack_url']) : ''
         );
     }
 
-    public function app_id_callback() {
+    public function app_id_callback()
+    {
         if(defined('STACKSIGHT_SETTINGS_IN_DB') && STACKSIGHT_SETTINGS_IN_DB === true){
             printf(
                 '<input type="text" id="_id" name="stacksight_opt[_id]" value="%s" size="50" />',
@@ -1132,7 +1502,8 @@ class WPStackSightPlugin {
 
     }
 
-    public function token_callback() {
+    public function token_callback()
+    {
         if(defined('STACKSIGHT_SETTINGS_IN_DB') && STACKSIGHT_SETTINGS_IN_DB === true){
             printf(
                 '<input type="text" id="token" name="stacksight_opt[token]" value="%s" size="50" />',
@@ -1151,7 +1522,8 @@ class WPStackSightPlugin {
         }
     }
 
-    public function group_callback() {
+    public function group_callback()
+    {
         if(defined('STACKSIGHT_SETTINGS_IN_DB') && STACKSIGHT_SETTINGS_IN_DB === true){
             printf(
                 '<input type="text" id="group" name="stacksight_opt[group]" value="%s" size="50" />',
@@ -1170,7 +1542,8 @@ class WPStackSightPlugin {
         }
     }
 
-    public function enable_slack_notify_logs_callback(){
+    public function enable_slack_notify_logs_callback()
+    {
         $checked = '';
         if(isset($this->options_slack['enable_slack_notify_logs']) && $this->options_slack['enable_slack_notify_logs'] == true){
             $checked = 'checked';
@@ -1178,7 +1551,8 @@ class WPStackSightPlugin {
         printf('<div><input type="checkbox" name="stacksight_opt_slack[enable_slack_notify_logs]" id="enable_slack_notify_logs" '.$checked.' /></div>');
     }
 
-    public function enable_slack_options_callback(){
+    public function enable_slack_options_callback()
+    {
         $options = array(
             'error' => 'Errors',
             'warn' => 'Warning',
@@ -1196,7 +1570,8 @@ class WPStackSightPlugin {
         }
     }
 
-    public function enable_options_callback(){
+    public function enable_options_callback()
+    {
         $options = array(
             'logs' => 'Logs',
             'health_seo' => 'Health SEO',
@@ -1216,7 +1591,8 @@ class WPStackSightPlugin {
         }
     }
 
-    public function cron_updates_interval_callback() {
+    public function cron_updates_interval_callback()
+    {
         $arr_opt = array(
             1 => 'Every second',
             60 => 'Every minute',
@@ -1241,7 +1617,8 @@ class WPStackSightPlugin {
     /**
      * Displays all messages registered to 'your-settings-error-slug'
      */
-    public function show_errors() {
+    public function show_errors()
+    {
         settings_errors();
     }
 
@@ -1250,7 +1627,8 @@ class WPStackSightPlugin {
      * Если есть вернуть true, в противном случае false
      * @return bool да или нет на наличие сообщения типа 'error' соответственно
      */
-    public function any_form_errors() {
+    public function any_form_errors()
+    {
         $errors = get_settings_errors();
         foreach ($errors as $error) {
             if ($error['type'] == 'error') return true;
@@ -1258,23 +1636,29 @@ class WPStackSightPlugin {
         return false;
     }
 
-    public static function install() {
-
+    public static function install()
+    {
+        self::addToQueue(self::STACKSIGHT_HEALTH_QUEUE);
+        self::addToQueue(self::STACKSIGHT_UPDATES_QUEUE);
+        self::addToQueue(self::STACKSIGHT_INVENTORY_QUEUE);
     }
 
-    public static function uninstall() {
+    public static function uninstall()
+    {
         delete_option('stacksight_opt');
         wp_clear_scheduled_hook('stacksight_main_action');
     }
 
-    public function getRelativeRootPath() {
+    public function getRelativeRootPath()
+    {
         $plg_dir = str_replace('\\', '/', plugin_dir_path( __FILE__ ));
         $abs_path = str_replace('\\', '/', ABSPATH);
         if (strpos($plg_dir, $abs_path) === FALSE) return;
         return substr($plg_dir, strlen($abs_path));
     }
 
-    public function getDiagnostic($app) {
+    public function getDiagnostic($app)
+    {
         $list = array();
         $show_code = false;
 
@@ -1300,9 +1684,12 @@ class WPStackSightPlugin {
         return array('list' => array_reverse($list), 'show_code' => $show_code);
     }
 
-    public function getTotalState(){
+    public function getTotalState($host = false)
+    {
         global $wpdb;
-
+        if (!function_exists('get_home_path')) {
+            require_once( ABSPATH . '/wp-admin/includes/file.php' );
+        }
         $plugin_info = get_plugin_data(dirname(__FILE__).'/wp-stacksight.php');
         if(function_exists('exec')){
             if (is_multisite()) {
@@ -1379,7 +1766,20 @@ class WPStackSightPlugin {
             }
         }
 
-        $owner_mail = get_option('admin_email');
+        if($host){
+            $owner_mail = $this->getBlogOption($host, 'admin_email', false);
+            $plugin_info['blog_title'] = $this->getBlogOption($host, 'blogname', false);
+            $plugin_info['public'] = $this->getBlogOption($host, 'blog_public', false);
+            $protocol = stripos($_SERVER['SERVER_PROTOCOL'], 'https') === true ? 'https://' : 'http://';
+            $plugin_info['url'] = $protocol.$host;
+
+        } else{
+            $owner_mail = get_option('admin_email');
+            $plugin_info['blog_title'] = (get_option('blogname')) ? get_option('blogname') : false;
+            $plugin_info['public'] = get_option('blog_public');
+            $plugin_info['url'] = get_home_url();
+        }
+
         $user_owner = get_user_by_email($owner_mail);
         if($user_owner){
             $plugin_info['owner'] = array(
@@ -1390,9 +1790,6 @@ class WPStackSightPlugin {
                 'user_link' => get_edit_user_link($user_owner->get('id')),
             );
         }
-
-        $plugin_info['public'] = get_option('blog_public');
-        $plugin_info['url'] = get_home_url();
 
         return array(
             'app' => $plugin_info,
@@ -1413,4 +1810,5 @@ class WPStackSightPlugin {
     }
 
 }
+
 $ss_client_plugin = new WPStackSightPlugin();
