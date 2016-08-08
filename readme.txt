@@ -46,6 +46,8 @@ stacksight contributions can be done through submiting PRS to the [Github repo](
 
 
 == Changelog ==
+= 1.10.0 =
+- Added new functionality for working with multisite
 
 = 1.9.3 =
 - Added MySQLi support

@@ -497,12 +497,6 @@ class WPStackSightPlugin {
     {
         if(defined('STACKSIGHT_INCLUDE_EVENTS') && STACKSIGHT_INCLUDE_EVENTS == true && defined('STACKSIGHT_ACTIVE_AAL') && STACKSIGHT_ACTIVE_AAL === true){
             $event = array();
-            if (is_user_logged_in()) {
-                $user = wp_get_current_user();
-                $event['user'] = array(
-                    'name' => $user->user_login
-                );
-            }
             switch ($args['object_type']) {
                 case 'Attachment':
                     $mime = get_post_mime_type($args['object_id']);
@@ -573,6 +567,13 @@ class WPStackSightPlugin {
                     break;
             }
 
+            if (is_user_logged_in() && !empty($event)) {
+                $user = wp_get_current_user();
+                $event['user'] = array(
+                    'name' => $user->user_login
+                );
+            }
+
             $ready_show_debug = false;
 
             if(is_admin() && (defined('STACKSIGHT_DEBUG') && STACKSIGHT_DEBUG === true)){
@@ -582,12 +583,19 @@ class WPStackSightPlugin {
                 }
             }
 
-            $res = $this->ss_client->publishEvent($event);
+            SSUtilities::error_log($args, 'debug', true, true);
+            print_r($args);
+
+            if($event){
+                $res = $this->ss_client->publishEvent($event);
+            }
+
             if($ready_show_debug === true){
                 if(isset($_SESSION['stacksight_debug']['events']) && !empty($_SESSION['stacksight_debug']['events'])){
                     SSUtilities::error_log(print_r($_SESSION['stacksight_debug']['events'], true), 'debug_events', true);
                 }
             }
+
             if (!$res['success']) SSUtilities::error_log($res['message'], 'error');
         }
     }
