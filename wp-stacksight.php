@@ -3,7 +3,7 @@
  * Plugin Name: Stacksight
  * Plugin URI: https://wordpress.org/plugins/stacksight/
  * Description: Stacksight wordpress support (featuring events, error logs and updates)
- * Version: 1.10.0
+ * Version: 1.10.1
  * Author: Stacksight LTD
  * Author URI: http://stacksight.io
  * License: GPL
