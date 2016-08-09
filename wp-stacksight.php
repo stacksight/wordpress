@@ -3,7 +3,7 @@
  * Plugin Name: Stacksight
  * Plugin URI: https://wordpress.org/plugins/stacksight/
  * Description: Stacksight wordpress support (featuring events, error logs and updates)
- * Version: 1.10.0
+ * Version: 1.10.1
  * Author: Stacksight LTD
  * Author URI: http://stacksight.io
  * License: GPL
@@ -497,12 +497,7 @@ class WPStackSightPlugin {
     {
         if(defined('STACKSIGHT_INCLUDE_EVENTS') && STACKSIGHT_INCLUDE_EVENTS == true && defined('STACKSIGHT_ACTIVE_AAL') && STACKSIGHT_ACTIVE_AAL === true){
             $event = array();
-            if (is_user_logged_in()) {
-                $user = wp_get_current_user();
-                $event['user'] = array(
-                    'name' => $user->user_login
-                );
-            }
+            
             switch ($args['object_type']) {
                 case 'Attachment':
                     $mime = get_post_mime_type($args['object_id']);
@@ -569,25 +564,55 @@ class WPStackSightPlugin {
 
                     break;
 
+                case 'Plugin':
+                    $event = array(
+                            'action' => $args['action'],
+                            'type' => 'plugin',
+                            'subtype' => $args['object_subtype'],
+                            'name' => $args['object_name'],
+                            'id' => $args['object_id']
+                        ) + $event;
+                    break;
+
+                case 'Theme':
+                    $event = array(
+                            'action' => $args['action'],
+                            'type' => 'theme',
+                            'subtype' => $args['object_subtype'],
+                            'name' => $args['object_name'],
+                            'id' => $args['object_id']
+                        ) + $event;
+                    break;
                 default:
                     break;
             }
 
+            if (is_user_logged_in() && !empty($event)) {
+                $user = wp_get_current_user();
+                $event['user'] = array(
+                    'name' => $user->user_login
+                );
+            }
+
             $ready_show_debug = false;
 
-            if(is_admin() && (defined('STACKSIGHT_DEBUG') && STACKSIGHT_DEBUG === true)){
-                if(!strpos($_SERVER['REQUEST_URI'], 'page=stacksight&tab=debug_mode')){
-                    define('STACKSIGHT_DEBUG_MODE',true);
+            if(is_admin() && (defined('STACKSIGHT_DEBUG') && STACKSIGHT_DEBUG === true)) {
+                if (!strpos($_SERVER['REQUEST_URI'], 'page=stacksight&tab=debug_mode')) {
+                    define('STACKSIGHT_DEBUG_MODE', true);
                     $ready_show_debug = true;
                 }
             }
 
-            $res = $this->ss_client->publishEvent($event);
+            if($event){
+                $res = $this->ss_client->publishEvent($event);
+            }
+
             if($ready_show_debug === true){
                 if(isset($_SESSION['stacksight_debug']['events']) && !empty($_SESSION['stacksight_debug']['events'])){
                     SSUtilities::error_log(print_r($_SESSION['stacksight_debug']['events'], true), 'debug_events', true);
                 }
             }
+
             if (!$res['success']) SSUtilities::error_log($res['message'], 'error');
         }
     }
@@ -1099,6 +1124,7 @@ class WPStackSightPlugin {
         if ( ! function_exists( 'get_plugins' ) ) {
             require_once ABSPATH . 'wp-admin/includes/plugin.php';
         }
+
         $upd = array();
         $plg_upd = get_plugin_updates();
         $thm_upd = get_theme_updates();
@@ -1733,7 +1759,28 @@ class WPStackSightPlugin {
         }
 
         $plugin_info['wpml_lang'] = false;
-        $login_activity_table = $wpdb->prefix.'aiowps_login_activity';
+
+
+
+        if($host && is_multisite()){
+            $sql = $wpdb->prepare("SELECT blog_id, domain, path FROM $wpdb->blogs WHERE archived='0' AND deleted ='0'", '');
+            $blogs = $wpdb->get_results($sql);
+            $prefix = false;
+            foreach($blogs as $blog){
+                if($blog->domain == $host){
+                    $prefix = $wpdb->base_prefix.$blog->blog_id.'_';
+                    break;
+                }
+            }
+            if($prefix){
+                $login_activity_table = $prefix.'aiowps_login_activity';
+            } else{
+                $login_activity_table = $wpdb->prefix.'aiowps_login_activity';
+            }
+        } else{
+            $login_activity_table = $wpdb->prefix.'aiowps_login_activity';
+        }
+
         $data = $wpdb->get_results($wpdb->prepare("SELECT * FROM $login_activity_table ORDER BY login_date DESC LIMIT %d", 1), ARRAY_A);
         $login_date = false;
         $table = _get_meta_table('user');

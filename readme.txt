@@ -1,9 +1,9 @@
 === Stacksight ===
-Contributors: liorkesos, bora-89, igor-lemon
+Contributors: liorkesos, bora-89, igor-lemon, zstolar
 Tags: administration, activity, event, monitor, multisite, multi-users, log, logger, audit log, stats, security, tracking, woocommerce, notifications, email notifications
 Requires at least: 3.5
 Tested up to: 4.3
-Stable tag: 1.10.0
+Stable tag: 1.10.1
 License: GPLv2 or later
 
 
@@ -16,7 +16,46 @@ StackSight provides operational insights for opensource applications providing  
 
 If you have more than 3-5 websites, you’re quickly overwhelmed by events and updates on them. Stacksight puts all the information in a one easy-to-use dashboard and allows you to diagnose and solve problems faster, reduce troubleshooting time and avoid the constant juggling between different plug-ins and tools.
 
+###Updates
+Get real-time tracking of events and changes in your website. Configure your notifications and integrations and start making troubleshooting a breeze.
+###Events
+Stacksight informs you about available updates and keep your system  in perfect condition at all time. See the list of logged events further down this list.
+###Logs
+Get real-time logging information of warnings and errors regarding the Wordpress app. Share insights on the fly with other team members and solve problems faster.
+###Organizational Policies 
+Stacksight allows you to set your policy around the matrix above and track your performance over time, get alerted when something goes wrong...
+###Debugging collaboration
+With stacksight debugging tools finding an accessibility issue, performance, security etc is simple and visual than ever.
+
+###Stacksight logs the following events to the stacksight.io dashboard:
+* **WordPress** - Core Updates
+* **Posts** - Created, Updated, Deleted
+* **Pages** - Created, Updated, Deleted
+* **Custom Post Type** - Created, Updated, Deleted
+* **Tags** - Created, Edited, Deleted
+* **Categories** - Created, Edited, Deleted
+* **Taxonomies** - Created, Edited, Deleted
+* **Comments** - Created, Approved, Unproved, Trashed, Untrashed, Spammed, Unspammed, Deleted
+* **Media** - Uploaded, Edited, Deleted
+* **Users** - Login, Logout, Login has failed, Update profile, Registered and Deleted
+* **Plugins** - Installed, Updated, Activated, Deactivated, Changed
+* **Themes** - Installed, Updated, Deleted, Activated, Changed (Editor and Customizer)
+* **Widgets** - Added to a sidebar / Deleted from a sidebar, Order widgets
+* **Menus** - A menu is being Created, Updated, Deleted
+* **Setting** - General, Writing, Reading, Discussion, Media, Permalinks
+* **Options** - Can be extend by east filter
+* **Export** - User download export file from the site
+* **WooCommerce** - Monitor all shop options
+* **bbPress** - Forums, Topics, Replies, Taxonomies and other actions
+* and **much more**...
+
+### Cross-Platform
+Stacksight is not limited only to Wordpress. If you host or manage multiple Open Source applications, such as Drupal, Magento, Moodle, or any other PHP based application (Simphony
+
+
+
 ==== stacksight ====
+
 stacksight contributions can be done through submiting PRS to the [Github repo](http://github.com/stacksight/wordpress).
 
 == Installation ==
@@ -46,6 +85,12 @@ stacksight contributions can be done through submiting PRS to the [Github repo](
 
 
 == Changelog ==
+= 1.10.1 =
+- Added new events for plugins and themes
+- Fixed last login field in Inventory
+
+= 1.10.0 =
+- Added new functionality for working with multisite
 
 = 1.9.3 =
 - Added MySQLi support
@@ -59,4 +104,3 @@ stacksight contributions can be done through submiting PRS to the [Github repo](
 
 = 1.1 =
 * Track wp events in the stacksight.io
-
