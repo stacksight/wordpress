@@ -564,6 +564,25 @@ class WPStackSightPlugin {
 
                     break;
 
+                case 'Plugin':
+                    $event = array(
+                            'action' => $args['action'],
+                            'type' => 'plugin',
+                            'subtype' => $args['object_subtype'],
+                            'name' => $args['object_name'],
+                            'id' => $args['object_id']
+                        ) + $event;
+                    break;
+
+                case 'Theme':
+                    $event = array(
+                            'action' => $args['action'],
+                            'type' => 'theme',
+                            'subtype' => $args['object_subtype'],
+                            'name' => $args['object_name'],
+                            'id' => $args['object_id']
+                        ) + $event;
+                    break;
                 default:
                     break;
             }
