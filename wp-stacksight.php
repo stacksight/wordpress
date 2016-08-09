@@ -497,6 +497,7 @@ class WPStackSightPlugin {
     {
         if(defined('STACKSIGHT_INCLUDE_EVENTS') && STACKSIGHT_INCLUDE_EVENTS == true && defined('STACKSIGHT_ACTIVE_AAL') && STACKSIGHT_ACTIVE_AAL === true){
             $event = array();
+            
             switch ($args['object_type']) {
                 case 'Attachment':
                     $mime = get_post_mime_type($args['object_id']);
@@ -576,15 +577,12 @@ class WPStackSightPlugin {
 
             $ready_show_debug = false;
 
-            if(is_admin() && (defined('STACKSIGHT_DEBUG') && STACKSIGHT_DEBUG === true)){
-                if(!strpos($_SERVER['REQUEST_URI'], 'page=stacksight&tab=debug_mode')){
-                    define('STACKSIGHT_DEBUG_MODE',true);
+            if(is_admin() && (defined('STACKSIGHT_DEBUG') && STACKSIGHT_DEBUG === true)) {
+                if (!strpos($_SERVER['REQUEST_URI'], 'page=stacksight&tab=debug_mode')) {
+                    define('STACKSIGHT_DEBUG_MODE', true);
                     $ready_show_debug = true;
                 }
             }
-
-            SSUtilities::error_log($args, 'debug', true, true);
-            print_r($args);
 
             if($event){
                 $res = $this->ss_client->publishEvent($event);
@@ -1107,6 +1105,7 @@ class WPStackSightPlugin {
         if ( ! function_exists( 'get_plugins' ) ) {
             require_once ABSPATH . 'wp-admin/includes/plugin.php';
         }
+
         $upd = array();
         $plg_upd = get_plugin_updates();
         $thm_upd = get_theme_updates();
@@ -1741,7 +1740,28 @@ class WPStackSightPlugin {
         }
 
         $plugin_info['wpml_lang'] = false;
-        $login_activity_table = $wpdb->prefix.'aiowps_login_activity';
+
+
+
+        if($host && is_multisite()){
+            $sql = $wpdb->prepare("SELECT blog_id, domain, path FROM $wpdb->blogs WHERE archived='0' AND deleted ='0'", '');
+            $blogs = $wpdb->get_results($sql);
+            $prefix = false;
+            foreach($blogs as $blog){
+                if($blog->domain == $host){
+                    $prefix = $wpdb->base_prefix.$blog->blog_id.'_';
+                    break;
+                }
+            }
+            if($prefix){
+                $login_activity_table = $prefix.'aiowps_login_activity';
+            } else{
+                $login_activity_table = $wpdb->prefix.'aiowps_login_activity';
+            }
+        } else{
+            $login_activity_table = $wpdb->prefix.'aiowps_login_activity';
+        }
+
         $data = $wpdb->get_results($wpdb->prepare("SELECT * FROM $login_activity_table ORDER BY login_date DESC LIMIT %d", 1), ARRAY_A);
         $login_date = false;
         $table = _get_meta_table('user');
