@@ -731,6 +731,15 @@ class WPStackSightPlugin {
                 } else{
                     $version = $plugin['Version'];
                 }
+
+                if(!isset($active) && $blog_id){
+                    if(is_multisite()){
+                        $active = $this->is_blog_plugin_active($path, $blog_id);
+                    } else{
+                        $active = is_plugin_active($path);
+                    }
+                }
+
                 if($skip === false){
                     $plugins[] = array(
                         'type' => SSWordpressClient::TYPE_PLUGIN,
