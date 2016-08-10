@@ -732,8 +732,8 @@ class WPStackSightPlugin {
                     $version = $plugin['Version'];
                 }
 
-                if(!isset($active) && $blog_id){
-                    if(is_multisite()){
+                if(!isset($active)){
+                    if(is_multisite() && $blog_id){
                         $active = $this->is_blog_plugin_active($path, $blog_id);
                     } else{
                         $active = is_plugin_active($path);
@@ -747,7 +747,7 @@ class WPStackSightPlugin {
                         'version' => $version,
                         'label' => $plugin['Name'],
                         'description' => $plugin['Description'],
-                        'active' => (isset($active)) ? $active : is_plugin_active($path),
+                        'active' => $active,
                         'requires' => array()
                     );
                 }
@@ -1829,7 +1829,10 @@ class WPStackSightPlugin {
             $login_activity_table = $wpdb->prefix.'aiowps_login_activity';
         }
 
-        $data = $wpdb->get_results($wpdb->prepare("SELECT * FROM $login_activity_table ORDER BY login_date DESC LIMIT %d", 1), ARRAY_A);
+        if($wpdb->get_var("SHOW TABLES LIKE '$login_activity_table'") == $login_activity_table) {
+            $data = $wpdb->get_results($wpdb->prepare("SELECT * FROM $login_activity_table ORDER BY login_date DESC LIMIT %d", 1), ARRAY_A);
+        }
+        
         $login_date = false;
         $table = _get_meta_table('user');
 
