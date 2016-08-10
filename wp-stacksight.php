@@ -393,7 +393,7 @@ class WPStackSightPlugin {
         }
     }
 
-    function is_blog_plugin_active($plugin, $blog_id)
+    public function is_blog_plugin_active($plugin, $blog_id)
     {
         return in_array($plugin, (array) get_blog_option($blog_id, 'active_plugins', array())) || is_plugin_active_for_network( $plugin );
     }
@@ -703,14 +703,14 @@ class WPStackSightPlugin {
                         case self::ACTION_ACTIVATE_DEACTIVATE:
                             if($plugin_name && $path == $plugin_name){
                                 if($blog_id){
-                                    $active = (is_blog_plugin_active($path, $blog_id)) ? false : true;
+                                    $active = ($this->is_blog_plugin_active($path, $blog_id)) ? false : true;
                                 } else{
                                     $active = (is_plugin_active($path)) ? false : true;
                                 }
 
                             } else{
                                 if($blog_id){
-                                    $active =  (is_blog_plugin_active($path)) ? true : false;
+                                    $active =  ($this->is_blog_plugin_active($path)) ? true : false;
                                 } else{
                                     $active =  (is_plugin_active($path)) ? true : false;
                                 }
