@@ -95,6 +95,8 @@ class WPStackSightPlugin {
             add_action('admin_init', array($this, 'page_init'));
             add_action('admin_notices', array($this, 'show_errors'));
             add_filter('plugin_action_links_' . plugin_basename(__FILE__), array($this, 'stacksight_plugin_action_links'));
+
+            add_action( 'admin_action_sends_all_data', array($this, 'sends_all_data_admin_action'));
         }
     }
 
@@ -813,8 +815,44 @@ class WPStackSightPlugin {
         <?php
     }
 
+    public function sends_all_data_admin_action($is_first = 'XXX')
+    {
+        $this->addToQueue(self::STACKSIGHT_HEALTH_QUEUE);
+        $this->addToQueue(self::STACKSIGHT_UPDATES_QUEUE);
+        $this->addToQueue(self::STACKSIGHT_INVENTORY_QUEUE);
+        $this->addToQueue(self::STACKSIGHT_HANDSHAKE_QUEUE);
+        $this->sendsAllData();
+    }
+
+    private  function sendsAllData(){
+        $this->cron_do_main_job();
+        $queue = get_option(self::STACKSIGHT_HANDSHAKE_QUEUE);
+        if($queue){
+            $queue_array = json_decode($queue);
+            if(sizeof($queue_array) > 0 ){
+                $this->sendsAllData();
+            } else{
+                wp_redirect( $_SERVER['HTTP_REFERER'] );
+                exit();
+            }
+        } else{
+            wp_redirect( $_SERVER['HTTP_REFERER'] );
+            exit();
+        }
+    }
+
     private function showDebugInfo()
     {
+        if(is_multisite()){
+            ?>
+            <div id="sends-all-data">
+                <form method="POST" action="<?php echo admin_url( 'admin.php' ); ?>">
+                    <input type="hidden" name="action" value="sends_all_data" />
+                    <input type="submit" class="button-primary" value="Send data from all subsites" />
+                </form>
+            </div>
+            <?php
+        }
         if(isset($_SESSION['stacksight_debug']) && !empty($_SESSION['stacksight_debug']) && is_array($_SESSION['stacksight_debug'])){
             foreach($_SESSION['stacksight_debug'] as $key => $feature):?>
                 <div class="feature-block">
@@ -1667,6 +1705,7 @@ class WPStackSightPlugin {
         self::addToQueue(self::STACKSIGHT_HEALTH_QUEUE);
         self::addToQueue(self::STACKSIGHT_UPDATES_QUEUE);
         self::addToQueue(self::STACKSIGHT_INVENTORY_QUEUE);
+        self::addToQueue(self::STACKSIGHT_HANDSHAKE_QUEUE);
     }
 
     public static function uninstall()
