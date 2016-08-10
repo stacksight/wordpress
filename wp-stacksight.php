@@ -697,6 +697,7 @@ class WPStackSightPlugin {
 
         if($object_plugins && is_array($object_plugins)){
             foreach($object_plugins as $path => $plugin){
+                unset($active);
                 $skip = false;
                 if($action){
                     switch ($action){
