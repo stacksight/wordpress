@@ -355,7 +355,7 @@ class WPStackSightPlugin {
 
         SSUtilities::error_log('cron_do_main_job has been run', 'cron_log');
 
-        $this->sendHandShake(true, $host, false);
+        $this->sendHandShake(true, $host);
         // updates
         $this->sendUpdates(true, false, false, $host);
 
@@ -403,7 +403,7 @@ class WPStackSightPlugin {
             if($queue_json){
                 $queue = json_decode($queue_json);
             }
-            if(isset($queue) && sizeof($queue) > 0 &&  $use_queue == true){
+            if(isset($queue) && sizeof($queue) > 0 &&  $use_queue === true){
                 $blogs_array = $queue;
                 $slice_size = (defined('STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST')) ? STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST : self::MULTI_SENDS_UPDATES_PER_REQUEST;
                 $blogs = array_slice($blogs_array, 0 , $slice_size);
@@ -839,10 +839,7 @@ class WPStackSightPlugin {
 
     private  function sendsAllData(){
         $this->cron_do_main_job();
-        $this->sliceQueue(self::STACKSIGHT_HEALTH_QUEUE);
-        $this->sliceQueue(self::STACKSIGHT_UPDATES_QUEUE);
-        $this->sliceQueue(self::STACKSIGHT_INVENTORY_QUEUE);
-        $this->sliceQueue(self::STACKSIGHT_HANDSHAKE_QUEUE);
+
         $queue = get_option(self::STACKSIGHT_HANDSHAKE_QUEUE);
         if($queue){
             $queue_array = json_decode($queue);
