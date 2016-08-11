@@ -355,7 +355,7 @@ class WPStackSightPlugin {
 
         SSUtilities::error_log('cron_do_main_job has been run', 'cron_log');
 
-        $this->sendHandShake(true, $host);
+        $this->sendHandShake(true, $host, false);
         // updates
         $this->sendUpdates(true, false, false, $host);
 
@@ -397,13 +397,13 @@ class WPStackSightPlugin {
         return in_array($plugin, (array) get_blog_option($blog_id, 'active_plugins', array())) || is_plugin_active_for_network( $plugin );
     }
 
-    public function sendHandshake($isMulticurl = true, $host = false){
+    public function sendHandshake($isMulticurl = true, $host = false, $use_queue = true){
         if(is_multisite()){
             $queue_json = get_option(self::STACKSIGHT_HANDSHAKE_QUEUE);
             if($queue_json){
                 $queue = json_decode($queue_json);
             }
-            if(isset($queue) && sizeof($queue) > 0){
+            if(isset($queue) && sizeof($queue) > 0 &&  $use_queue == true){
                 $blogs_array = $queue;
                 $slice_size = (defined('STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST')) ? STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST : self::MULTI_SENDS_UPDATES_PER_REQUEST;
                 $blogs = array_slice($blogs_array, 0 , $slice_size);
