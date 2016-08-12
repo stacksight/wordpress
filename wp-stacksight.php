@@ -867,7 +867,7 @@ class WPStackSightPlugin {
 
     private function showDebugInfo()
     {
-        if(is_multisite()){
+        if(is_multisite() && is_main_site()){
             ?>
             <div id="sends-all-data">
                 <form method="POST" action="<?php echo admin_url( 'admin.php' ); ?>">
