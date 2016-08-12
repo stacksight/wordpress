@@ -48,6 +48,8 @@ class WPStackSightPlugin {
         'STACKSIGHT_INCLUDE_UPDATES' => true
     );
 
+    private $stacksPerRequest;
+
     public function __construct()
     {
         register_activation_hook( __FILE__, array(__CLASS__, 'install'));
@@ -97,6 +99,13 @@ class WPStackSightPlugin {
             add_filter('plugin_action_links_' . plugin_basename(__FILE__), array($this, 'stacksight_plugin_action_links'));
             add_action( 'admin_action_sends_all_data', array($this, 'sends_all_data_admin_action'));
         }
+
+        if(defined('STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST')){
+            $this->stacksPerRequest = (int) STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST;
+        } else{
+            $this->stacksPerRequest = self::MULTI_SENDS_UPDATES_PER_REQUEST;
+        }
+
     }
 
     public function stacksightAddNewBlog($blog_id, $user_id, $domain, $path, $site_id, $meta)
@@ -337,7 +346,7 @@ class WPStackSightPlugin {
 
         if($queue){
             $blogs_array = json_decode($queue);
-            $slice_size = (defined('STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST')) ? STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST : self::MULTI_SENDS_UPDATES_PER_REQUEST;
+            $slice_size = $this->stacksPerRequest;
             $blogs = array_slice($blogs_array, 0 , $slice_size);
             if(sizeof($blogs) > 0){
                 foreach($blogs as $blog){
@@ -405,7 +414,7 @@ class WPStackSightPlugin {
             }
             if(isset($queue) && sizeof($queue) > 0 &&  $use_queue === true){
                 $blogs_array = $queue;
-                $slice_size = (defined('STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST')) ? STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST : self::MULTI_SENDS_UPDATES_PER_REQUEST;
+                $slice_size = $this->stacksPerRequest;
                 $blogs = array_slice($blogs_array, 0 , $slice_size);
                 if(sizeof($blogs) > 0){
                     foreach($blogs as $blog){
@@ -435,7 +444,7 @@ class WPStackSightPlugin {
                 }
                 if(isset($queue) && sizeof($queue) > 0){
                     $blogs_array = $queue;
-                    $slice_size = (defined('STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST')) ? STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST : self::MULTI_SENDS_UPDATES_PER_REQUEST;
+                    $slice_size = $this->stacksPerRequest;
                     $blogs = array_slice($blogs_array, 0 , $slice_size);
                     if(sizeof($blogs) > 0){
                         foreach($blogs as $blog){
@@ -459,7 +468,7 @@ class WPStackSightPlugin {
             $queue = get_option($param);
             if($queue){
                 $blogs_array = json_decode($queue);
-                $slice_size = (defined('STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST')) ? STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST : self::MULTI_SENDS_UPDATES_PER_REQUEST;
+                $slice_size = $this->stacksPerRequest;
                 $blogs = array_slice($blogs_array, 0 , $slice_size);
                 if(sizeof($blogs) > 0){
                     $blog_surplus = array_slice($blogs_array, $slice_size);
@@ -649,7 +658,7 @@ class WPStackSightPlugin {
             $queue = get_option(self::STACKSIGHT_INVENTORY_QUEUE);
             if($queue){
                 $blogs_array = json_decode($queue);
-                $slice_size = (defined('STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST')) ? STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST : self::MULTI_SENDS_UPDATES_PER_REQUEST;
+                $slice_size = $this->stacksPerRequest;
                 $blogs = array_slice($blogs_array, 0 , $slice_size);
                 if(sizeof($blogs) > 0){
                     $sql = $wpdb->prepare("SELECT blog_id, domain, path FROM $wpdb->blogs WHERE archived='0' AND deleted ='0'", '');
@@ -828,8 +837,9 @@ class WPStackSightPlugin {
         <?php
     }
 
-    public function sends_all_data_admin_action($is_first = 'XXX')
+    public function sends_all_data_admin_action()
     {
+        $this->stacksPerRequest = 1000000;
         $this->addToQueue(self::STACKSIGHT_HEALTH_QUEUE);
         $this->addToQueue(self::STACKSIGHT_UPDATES_QUEUE);
         $this->addToQueue(self::STACKSIGHT_INVENTORY_QUEUE);
