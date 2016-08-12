@@ -422,7 +422,7 @@ class WPStackSightPlugin {
                     }
                     $this->sliceQueue(self::STACKSIGHT_HANDSHAKE_QUEUE);
                 }
-                $this->handshake($isMulticurl, $host);
+//                $this->handshake($isMulticurl, $host);
             } else{
                 $this->handshake($isMulticurl, $host);
             }
@@ -452,7 +452,7 @@ class WPStackSightPlugin {
                         }
                         $this->sliceQueue(self::STACKSIGHT_UPDATES_QUEUE);
                     }
-                    $this->ss_client->sendUpdates($updates, true, $host);
+//                    $this->ss_client->sendUpdates($updates, true, $host);
                 } else{
                     $this->ss_client->sendUpdates($updates, true, $host);
                 }
@@ -683,7 +683,7 @@ class WPStackSightPlugin {
                             $this->ss_client->sendInventory($data, $multicurl, $blog);
                         }
                     }
-                    $this->sendInventory($plugin_name, true, false, $action);
+                    //$this->sendInventory($plugin_name, true, false, $action);
                     $this->sliceQueue(self::STACKSIGHT_INVENTORY_QUEUE);
                 } else{
                     $this->sendInventory($plugin_name, true, false, $action);
