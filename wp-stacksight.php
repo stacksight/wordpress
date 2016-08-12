@@ -139,7 +139,11 @@ class WPStackSightPlugin {
     public function stacksightActivatedPlugin($plugin_name, $network_wide)
     {
         $this->addToQueue(self::STACKSIGHT_HANDSHAKE_QUEUE);
-        $this->sendInventory($plugin_name, true, false, self::ACTION_ACTIVATE_DEACTIVATE, $network_wide);
+        if($network_wide == true) {
+            $this->sendInventory($plugin_name, true, false, self::ACTION_ACTIVATE_DEACTIVATE, $network_wide, true);
+        } else{
+            $this->sendInventory($plugin_name, true, false, self::ACTION_ACTIVATE_DEACTIVATE, $network_wide);
+        }
         $this->sendHandshake(true);
         $this->ss_client->sendMultiCURL();
     }
@@ -147,7 +151,13 @@ class WPStackSightPlugin {
     public function stacksightDeactivatedPlugin($plugin_name, $network_wide)
     {
         $this->addToQueue(self::STACKSIGHT_HANDSHAKE_QUEUE);
-        $this->sendInventory($plugin_name, true, false, self::ACTION_ACTIVATE_DEACTIVATE, $network_wide);
+        if($network_wide == true){
+            $this->sendInventory($plugin_name, true, false, self::ACTION_ACTIVATE_DEACTIVATE, $network_wide, true);
+
+        } else{
+            $this->sendInventory($plugin_name, true, false, self::ACTION_ACTIVATE_DEACTIVATE, $network_wide);
+
+        }
         $this->sendHandshake(true);
         $this->ss_client->sendMultiCURL();
     }
@@ -401,9 +411,35 @@ class WPStackSightPlugin {
         }
     }
 
-    public function is_blog_plugin_active($plugin, $blog_id)
+    public function is_blog_plugin_active($plugin, $blog_id, $network_wide = false)
     {
-        return in_array($plugin, (array) get_blog_option($blog_id, 'active_plugins', array())) || is_plugin_active_for_network( $plugin );
+        if($network_wide == true){
+            if(is_plugin_active_for_network($plugin) && in_array($plugin, (array) get_blog_option($blog_id, 'active_plugins', array()))){
+                return false;
+            }
+            if(!is_plugin_active_for_network($plugin) && in_array($plugin, (array) get_blog_option($blog_id, 'active_plugins', array()))){
+                return false;
+            }
+            if(is_plugin_active_for_network($plugin) && !in_array($plugin, (array) get_blog_option($blog_id, 'active_plugins', array()))){
+                return true;
+            }
+            if(!is_plugin_active_for_network($plugin) && !in_array($plugin, (array) get_blog_option($blog_id, 'active_plugins', array()))){
+                return false;
+            }
+        } else{
+            if(is_plugin_active_for_network($plugin) && in_array($plugin, (array) get_blog_option($blog_id, 'active_plugins', array()))){
+                return false;
+            }
+            if(!is_plugin_active_for_network($plugin) && in_array($plugin, (array) get_blog_option($blog_id, 'active_plugins', array()))){
+                return true;
+            }
+            if(is_plugin_active_for_network($plugin) && !in_array($plugin, (array) get_blog_option($blog_id, 'active_plugins', array()))){
+                return true;
+            }
+            if(!is_plugin_active_for_network($plugin) && !in_array($plugin, (array) get_blog_option($blog_id, 'active_plugins', array()))){
+                return false;
+            }
+        }
     }
 
     public function sendHandshake($isMulticurl = true, $host = false, $use_queue = true){
@@ -710,16 +746,17 @@ class WPStackSightPlugin {
                 if($action){
                     switch ($action){
                         case self::ACTION_ACTIVATE_DEACTIVATE:
+                            SSUtilities::error_log('::: '.$plugin_name.' ::: '.$path.' ::: _'.$blog_id.'_', 'info', false, true);
                             if($plugin_name && $path == $plugin_name){
-                                if($blog_id){
-                                    $active = ($this->is_blog_plugin_active($path, $blog_id)) ? false : true;
+                                if($blog_id || is_main_site()){
+                                    $active = ($this->is_blog_plugin_active($path, $blog_id, $network_wide)) ? false : true;
                                 } else{
                                     $active = (is_plugin_active($path)) ? false : true;
                                 }
 
                             } else{
                                 if($blog_id){
-                                    $active =  ($this->is_blog_plugin_active($path)) ? true : false;
+                                    $active =  ($this->is_blog_plugin_active($path, $blog_id, $network_wide)) ? true : false;
                                 } else{
                                     $active =  (is_plugin_active($path)) ? true : false;
                                 }
