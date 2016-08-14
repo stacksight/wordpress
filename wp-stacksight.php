@@ -81,7 +81,7 @@ class WPStackSightPlugin {
                     add_action('aal_insert_log', array(&$this, 'insert_log_mean'), 30);
                 }
             }
-            
+
             add_action('stacksight_main_action', array($this, 'cron_do_main_job'));
 
             add_action('upgrader_process_complete', array( &$this, 'stacksightPluginInstallUpdate' ), 10, 2);
@@ -110,7 +110,7 @@ class WPStackSightPlugin {
 
     public function stacksightAddNewBlog($blog_id, $user_id, $domain, $path, $site_id, $meta)
     {
-	    $this->cron_do_main_job($domain);
+        $this->cron_do_main_job($domain);
         $this->sendInventory(false, true, $domain);
         $this->ss_client->sendMultiCURL();
     }
@@ -398,7 +398,9 @@ class WPStackSightPlugin {
         if($blogs){
             $is_result = false;
             foreach($blogs as $blog){
-                if($blog->domain == $host){
+                $path = substr($blog->path, 0, -1);
+                $blog_domain = $blog->domain.$path;
+                if($blog_domain == $host){
                     $is_result == true;
                     return get_blog_option($blog->blog_id, $param, $default_param);
                 }
@@ -526,7 +528,8 @@ class WPStackSightPlugin {
         if($blogs){
             $blogs_array = array();
             foreach($blogs as $blog) {
-                $blogs_array[] = $blog->domain;
+                $path = substr($blog->path, 0, -1);
+                $blogs_array[] = $blog->domain.$path;
             }
 
             $param_db = get_option($param);
@@ -543,7 +546,7 @@ class WPStackSightPlugin {
     {
         if(defined('STACKSIGHT_INCLUDE_EVENTS') && STACKSIGHT_INCLUDE_EVENTS == true && defined('STACKSIGHT_ACTIVE_AAL') && STACKSIGHT_ACTIVE_AAL === true){
             $event = array();
-            
+
             switch ($args['object_type']) {
                 case 'Attachment':
                     $mime = get_post_mime_type($args['object_id']);
@@ -702,7 +705,8 @@ class WPStackSightPlugin {
                     if($blogs_db){
                         $blogs_assoc_array = array();
                         foreach($blogs_db as $blog) {
-                            $blogs_assoc_array[$blog->domain] = $blog->blog_id;
+                            $path = substr($blog->path, 0, -1);
+                            $blogs_assoc_array[$blog->domain.$path] = $blog->blog_id;
                         }
                     }
                     foreach($blogs as $blog){
@@ -1867,7 +1871,9 @@ class WPStackSightPlugin {
             $blogs = $wpdb->get_results($sql);
             $prefix = false;
             foreach($blogs as $blog){
-                if($blog->domain == $host){
+                $path = substr($blog->path, 0, -1);
+                $blog_domain = $blog->domain.$path;
+                if($blog_domain == $host){
                     $prefix = $wpdb->base_prefix.$blog->blog_id.'_';
                     break;
                 }
