@@ -3,7 +3,7 @@
  * Plugin Name: Stacksight
  * Plugin URI: https://wordpress.org/plugins/stacksight/
  * Description: Stacksight wordpress support (featuring events, error logs and updates)
- * Version: 1.10.2
+ * Version: 1.10.3
  * Author: Stacksight LTD
  * Author URI: http://stacksight.io
  * License: GPL
@@ -415,7 +415,7 @@ class WPStackSightPlugin {
 
     public function is_blog_plugin_active($plugin, $blog_id, $network_wide = false)
     {
-        if($network_wide == true){
+        if($network_wide == true && is_multisite()){
             if(is_plugin_active_for_network($plugin) && in_array($plugin, (array) get_blog_option($blog_id, 'active_plugins', array()))){
                 return false;
             }
@@ -429,16 +429,16 @@ class WPStackSightPlugin {
                 return false;
             }
         } else{
-            if(is_plugin_active_for_network($plugin) && in_array($plugin, (array) get_blog_option($blog_id, 'active_plugins', array()))){
+            if(is_plugin_active_for_network($plugin) && in_array($plugin, (array) get_option('active_plugins', array()))){
                 return false;
             }
-            if(!is_plugin_active_for_network($plugin) && in_array($plugin, (array) get_blog_option($blog_id, 'active_plugins', array()))){
+            if(!is_plugin_active_for_network($plugin) && in_array($plugin, (array) get_option('active_plugins', array()))){
                 return true;
             }
-            if(is_plugin_active_for_network($plugin) && !in_array($plugin, (array) get_blog_option($blog_id, 'active_plugins', array()))){
+            if(is_plugin_active_for_network($plugin) && !in_array($plugin, (array) get_option('active_plugins', array()))){
                 return true;
             }
-            if(!is_plugin_active_for_network($plugin) && !in_array($plugin, (array) get_blog_option($blog_id, 'active_plugins', array()))){
+            if(!is_plugin_active_for_network($plugin) && !in_array($plugin, (array) get_option('active_plugins', array()))){
                 return false;
             }
         }
@@ -750,7 +750,6 @@ class WPStackSightPlugin {
                 if($action){
                     switch ($action){
                         case self::ACTION_ACTIVATE_DEACTIVATE:
-                            SSUtilities::error_log('::: '.$plugin_name.' ::: '.$path.' ::: _'.$blog_id.'_', 'info', false, true);
                             if($plugin_name && $path == $plugin_name){
                                 if($blog_id || is_main_site()){
                                     $active = ($this->is_blog_plugin_active($path, $blog_id, $network_wide)) ? false : true;

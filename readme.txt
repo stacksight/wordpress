@@ -3,7 +3,7 @@ Contributors: liorkesos, bora-89, igor-lemon, zstolar
 Tags: administration, activity, event, monitor, multisite, multi-users, log, logger, audit log, stats, security, tracking, woocommerce, notifications, email notifications
 Requires at least: 3.5
 Tested up to: 4.3
-Stable tag: 1.10.2
+Stable tag: 1.10.3
 License: GPLv2 or later
 
 
@@ -85,6 +85,9 @@ stacksight contributions can be done through submiting PRS to the [Github repo](
 
 
 == Changelog ==
+= 1.10.3 =
+Fixed bugs with regular mode
+
 = 1.10.2 =
 - Add button to sends full data from all subsites
 - Fix multisite domain with path mode
