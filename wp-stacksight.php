@@ -384,7 +384,7 @@ class WPStackSightPlugin {
         }
 
         if(defined('STACKSIGHT_INCLUDE_INVENTORY') && STACKSIGHT_INCLUDE_INVENTORY == true){
-            $this->sendInventories();
+            $this->sendInventories(false, false, true);
         }
 
         $this->ss_client->sendMultiCURL();
@@ -720,10 +720,9 @@ class WPStackSightPlugin {
                             $data = array(
                                 'data' => $inventory
                             );
-                            $this->ss_client->sendInventory($data, $multicurl, $blog);
+                            $this->ss_client->sendInventory($data, true, $blog);
                         }
                     }
-                    //$this->sendInventory($plugin_name, true, false, $action);
                     $this->sliceQueue(self::STACKSIGHT_INVENTORY_QUEUE);
                 } else{
                     $this->sendInventory($plugin_name, true, false, $action);
@@ -1639,8 +1638,9 @@ class WPStackSightPlugin {
             );
         } else{
             if(!defined('STACKSIGHT_TOKEN')){
+                $link = (defined('DOCS_URL')) ? '<a href="'.DOCS_URL.'" target="_blank">How to set?</a>' : '';
                 printf(
-                    '<span class="pre-code-red"> Not set </span>'
+                    '<span class="pre-code-red"> Not set </span>'.$link
                 );
             } else {
                 printf(
