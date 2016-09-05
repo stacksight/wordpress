@@ -240,7 +240,7 @@ class WPStackSightPlugin {
         return $schedules;
     }
 
-    public function handshake($multiCurl = false, $host = false)
+    public function handshake($multiCurl = false, $host = false, $manually_send = false)
     {
         $total_state = $this->getTotalState($host);
         $total_hash_state = md5(serialize($total_state));
@@ -255,8 +255,9 @@ class WPStackSightPlugin {
             $old_hash_state = $tempory['hash_of_state'];
             $date_of_old_hash_state = $tempory['date_of_set'];
         }
+
         // If we have changed state
-        if($total_hash_state != $old_hash_state){
+        if($total_hash_state != $old_hash_state || $manually_send === true){
             $time = time();
             // Send new state
             $handshake_event = array(
@@ -444,7 +445,7 @@ class WPStackSightPlugin {
         }
     }
 
-    public function sendHandshake($isMulticurl = true, $host = false, $use_queue = true){
+    public function sendHandshake($isMulticurl = true, $host = false, $use_queue = true, $manually_send = false){
         if(is_multisite()){
             $queue_json = get_option(self::STACKSIGHT_HANDSHAKE_QUEUE);
             if($queue_json){
@@ -456,16 +457,16 @@ class WPStackSightPlugin {
                 $blogs = array_slice($blogs_array, 0 , $slice_size);
                 if(sizeof($blogs) > 0){
                     foreach($blogs as $blog){
-                        $this->handshake($isMulticurl, $blog);
+                        $this->handshake($isMulticurl, $blog, $manually_send);
                     }
                     $this->sliceQueue(self::STACKSIGHT_HANDSHAKE_QUEUE);
                 }
-//                $this->handshake($isMulticurl, $host);
+                $this->handshake($isMulticurl, $host, $manually_send);
             } else{
-                $this->handshake($isMulticurl, $host);
+                $this->handshake($isMulticurl, $host, $manually_send);
             }
         } else{
-            $this->handshake($isMulticurl, $host);
+            $this->handshake($isMulticurl, $host, $manually_send);
         }
     }
 
