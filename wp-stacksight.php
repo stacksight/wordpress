@@ -1429,9 +1429,14 @@ class WPStackSightPlugin {
             );
         }
 
+        $token_title = 'Access Token *';
+        if((defined('DOCS_URL') && !empty(DOCS_URL)) && (!defined('STACKSIGHT_TOKEN') || empty(STACKSIGHT_TOKEN))){
+            $token_title .= '<a href="'.DOCS_URL.'" class="howto" target="_blank">How to set?</a>';
+        }
+
         add_settings_field(
             'token',
-            'Access Token *',
+            $token_title,
             array( $this, 'token_callback' ),
             'stacksight-set-admin',
             'setting_section_stacksight'
@@ -1639,7 +1644,6 @@ class WPStackSightPlugin {
             );
         } else{
             if(!defined('STACKSIGHT_TOKEN')){
-                $link = (defined('DOCS_URL')) ? '<a href="'.DOCS_URL.'" target="_blank">How to set?</a>' : '';
                 printf(
                     '<span class="pre-code-red"> Not set </span>'.$link
                 );
