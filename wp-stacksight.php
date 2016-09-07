@@ -97,7 +97,7 @@ class WPStackSightPlugin {
             add_action('admin_init', array($this, 'page_init'));
             add_action('admin_notices', array($this, 'show_errors'));
             add_filter('plugin_action_links_' . plugin_basename(__FILE__), array($this, 'stacksight_plugin_action_links'));
-            add_action( 'admin_action_sends_all_data', array($this, 'sends_all_data_admin_action'));
+            add_action('admin_action_sends_all_data', array($this, 'sends_all_data_admin_action'));
         }
 
         if(defined('STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST')){
@@ -866,8 +866,11 @@ class WPStackSightPlugin {
                     } else{
                         if(defined('STACKSIGHT_DEBUG') && STACKSIGHT_DEBUG === true){
                             define('STACKSIGHT_DEBUG_MODE',true);
-                            $_SESSION['stacksight_debug'] = array();
-                            $this->cron_do_main_job();
+                            $referer = $_SERVER['HTTP_REFERER'];
+                            if(strpos($referer, '&tab=debug_mode') !== false){
+                                $_SESSION['stacksight_debug'] = array();
+                                $this->cron_do_main_job();
+                            }
                             $this->showDebugInfo();
                         }
                     }
