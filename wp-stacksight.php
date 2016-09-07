@@ -866,11 +866,11 @@ class WPStackSightPlugin {
                     } else{
                         if(defined('STACKSIGHT_DEBUG') && STACKSIGHT_DEBUG === true){
                             define('STACKSIGHT_DEBUG_MODE',true);
-                            $referer = $_SERVER['HTTP_REFERER'];
-                            if(strpos($referer, '&tab=debug_mode') !== false){
+                            if(!isset($_SESSION['stacksight_send_all_data']) || (isset($_SESSION['stacksight_send_all_data']) && $_SESSION['stacksight_send_all_data'] == false)){
                                 $_SESSION['stacksight_debug'] = array();
                                 $this->cron_do_main_job();
                             }
+                            $_SESSION['stacksight_send_all_data'] = false;
                             $this->showDebugInfo();
                         }
                     }
@@ -886,6 +886,7 @@ class WPStackSightPlugin {
 
     public function sends_all_data_admin_action()
     {
+        $_SESSION['stacksight_send_all_data'] = true;
         $this->stacksPerRequest = 1000000;
         $this->addToQueue(self::STACKSIGHT_HEALTH_QUEUE);
         $this->addToQueue(self::STACKSIGHT_UPDATES_QUEUE);
