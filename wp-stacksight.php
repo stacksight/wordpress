@@ -454,7 +454,7 @@ class WPStackSightPlugin {
             if(isset($queue) && sizeof($queue) > 0 &&  $use_queue === true){
                 $blogs_array = $queue;
                 $slice_size = $this->stacksPerRequest;
-                $blogs = array_slice($blogs_array, 0 , $slice_size);
+                $blogs = array_slice($blogs_array, 0 , $slice_size - 1);
                 if(sizeof($blogs) > 0){
                     foreach($blogs as $blog){
                         $this->handshake($isMulticurl, $blog, $manually_send);
