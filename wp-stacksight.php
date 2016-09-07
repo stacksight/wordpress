@@ -516,7 +516,11 @@ class WPStackSightPlugin {
                     } else{
                         update_option($param, json_encode(array()));
                     }
+                } else{
+                    update_option($param, json_encode(array()));
                 }
+            } else{
+                update_option($param, json_encode(array()));
             }
         }
     }
