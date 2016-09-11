@@ -886,18 +886,22 @@ class WPStackSightPlugin {
 
     public function sends_all_data_admin_action()
     {
-        $_SESSION['stacksight_send_all_data'] = true;
-        $this->stacksPerRequest = 1000000;
-        $this->addToQueue(self::STACKSIGHT_HEALTH_QUEUE);
-        $this->addToQueue(self::STACKSIGHT_UPDATES_QUEUE);
-        $this->addToQueue(self::STACKSIGHT_INVENTORY_QUEUE);
-        $this->addToQueue(self::STACKSIGHT_HANDSHAKE_QUEUE);
-        $this->sendsAllData();
+        if(defined('STACKSIGHT_TOKEN') && !empty(STACKSIGHT_TOKEN)){
+            $_SESSION['stacksight_send_all_data'] = true;
+            $this->stacksPerRequest = 1000000;
+            $this->addToQueue(self::STACKSIGHT_HEALTH_QUEUE);
+            $this->addToQueue(self::STACKSIGHT_UPDATES_QUEUE);
+            $this->addToQueue(self::STACKSIGHT_INVENTORY_QUEUE);
+            $this->addToQueue(self::STACKSIGHT_HANDSHAKE_QUEUE);
+            $this->sendsAllData();
+        } else {
+            wp_redirect($_SERVER['HTTP_REFERER']);
+            exit();
+        }
     }
 
     private  function sendsAllData(){
         $this->cron_do_main_job();
-
         $queue = get_option(self::STACKSIGHT_HANDSHAKE_QUEUE);
         if($queue){
             $queue_array = json_decode($queue);
