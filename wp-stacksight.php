@@ -35,6 +35,9 @@ class WPStackSightPlugin {
     const STACKSIGHT_HEALTH_QUEUE = 'stacksight_health_queue';
     const STACKSIGHT_HANDSHAKE_QUEUE = 'stacksight_handshake_queue';
 
+    const LAST_SENDS_ALL_DATA = 'stacksight_last_sends_all_data';
+    const LAST_SENDS_ALL_DATA_TIME = 900;
+
     const STACKISGHT_PATH = 'stacksight/wp-stacksight.php';
 //    const STACKISGHT_PATH = 'wp-super-cache/wp-cache.php';
 
@@ -887,6 +890,17 @@ class WPStackSightPlugin {
     public function sends_all_data_admin_action()
     {
         if(defined('STACKSIGHT_TOKEN') && !empty(STACKSIGHT_TOKEN)){
+
+            $last_running_time = get_option(self::LAST_SENDS_ALL_DATA);
+            if($last_running_time){
+                if(time() - $last_running_time < self::LAST_SENDS_ALL_DATA_TIME){
+                    SSUtilities::error_log("NEED LEFT TIME", 'error_log');
+                    wp_redirect($_SERVER['HTTP_REFERER']);
+                    exit();
+                }
+            }
+
+            update_option(self::LAST_SENDS_ALL_DATA, time());
             $_SESSION['stacksight_send_all_data'] = true;
             $this->stacksPerRequest = 1000000;
             $this->addToQueue(self::STACKSIGHT_HEALTH_QUEUE);
@@ -920,11 +934,24 @@ class WPStackSightPlugin {
     private function showDebugInfo()
     {
         if(is_multisite() && is_main_site()){
+
+            $last_running_time = get_option(self::LAST_SENDS_ALL_DATA);
+            $enabled = '';
+            $title = 'Send data from all subsites';
+            if($last_running_time){
+                $tile_left = time() - $last_running_time;
+                if($tile_left < self::LAST_SENDS_ALL_DATA_TIME){
+                    $enabled = 'disabled="disabled"';
+                    $min = ceil($tile_left/60);
+                    $title = 'Send data from all subsites. Left '.$min.' min';
+                }
+            }
+
             ?>
             <div id="sends-all-data">
                 <form method="POST" action="<?php echo admin_url( 'admin.php' ); ?>">
                     <input type="hidden" name="action" value="sends_all_data" />
-                    <input type="submit" class="button-primary" value="Send data from all subsites" />
+                    <input type="submit" class="button-primary" value="<?php echo $title;?>" <?php echo $enabled;?> />
                 </form>
             </div>
             <?php
