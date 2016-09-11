@@ -939,10 +939,10 @@ class WPStackSightPlugin {
             $enabled = '';
             $title = 'Send data from all subsites';
             if($last_running_time){
-                $tile_left = time() - $last_running_time;
-                if($tile_left < self::LAST_SENDS_ALL_DATA_TIME){
+                $tile_left = self::LAST_SENDS_ALL_DATA_TIME - (time() - $last_running_time);
+                if($tile_left > 0){
                     $enabled = 'disabled="disabled"';
-                    $min = ceil($tile_left/60);
+                    $min = ceil($tile_left / 60);
                     $title = 'Send data from all subsites. Left '.$min.' min';
                 }
             }
