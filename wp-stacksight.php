@@ -381,7 +381,7 @@ class WPStackSightPlugin {
 
         SSUtilities::error_log('cron_do_main_job has been run', 'cron_log');
 
-        $this->sendHandshake(true, $host, false, true);
+        $this->sendHandshake(true, $host, true, false, true);
         // updates
         $this->sendUpdates(true, false, false, $host);
 
