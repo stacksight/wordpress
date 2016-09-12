@@ -43,6 +43,9 @@ class WPStackSightPlugin {
 
     const MULTI_SENDS_UPDATES_PER_REQUEST = 10;
 
+    const STACKSIGHT_HANDSHAKE_INTERVAL = 'stacksight_handshake_interval';
+    const STACKSIGHT_HANDSHAKE_INTERVAL_TIME = 3600;
+
     public $defaultDefines = array(
         'STACKSIGHT_INCLUDE_LOGS' => false,
         'STACKSIGHT_INCLUDE_HEALTH' => true,
@@ -378,7 +381,7 @@ class WPStackSightPlugin {
 
         SSUtilities::error_log('cron_do_main_job has been run', 'cron_log');
 
-        $this->sendHandshake(true, $host);
+        $this->sendHandshake(true, $host, false, true);
         // updates
         $this->sendUpdates(true, false, false, $host);
 
@@ -448,7 +451,21 @@ class WPStackSightPlugin {
         }
     }
 
-    public function sendHandshake($isMulticurl = true, $host = false, $use_queue = true, $manually_send = false){
+    public function sendHandshake($isMulticurl = true, $host = false, $use_queue = true, $manually_send = false, $send_from_curl = false){
+
+        if($send_from_curl == true){
+            $handshake_interval = get_option(self::STACKSIGHT_HANDSHAKE_INTERVAL);
+            if($handshake_interval){
+                if(time() - $handshake_interval < self::STACKSIGHT_HANDSHAKE_INTERVAL_TIME){
+                    $manually_send = true;
+                } else{
+                    $manually_send = false;
+                }
+            } else{
+                $manually_send = true;
+            }
+        }
+
         if(is_multisite()){
             $queue_json = get_option(self::STACKSIGHT_HANDSHAKE_QUEUE);
             if($queue_json){
@@ -466,7 +483,7 @@ class WPStackSightPlugin {
                 }
                 $this->handshake($isMulticurl, $host, $manually_send);
             } else{
-                $this->handshake($isMulticurl, $host, true);
+                $this->handshake($isMulticurl, $host, $manually_send);
             }
         } else{
             $this->handshake($isMulticurl, $host, $manually_send);
