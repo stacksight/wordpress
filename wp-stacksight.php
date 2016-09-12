@@ -466,7 +466,7 @@ class WPStackSightPlugin {
                 }
                 $this->handshake($isMulticurl, $host, $manually_send);
             } else{
-                $this->handshake($isMulticurl, $host, $manually_send);
+                $this->handshake($isMulticurl, $host, true);
             }
         } else{
             $this->handshake($isMulticurl, $host, $manually_send);
