@@ -457,14 +457,13 @@ class WPStackSightPlugin {
             $handshake_interval = get_option(self::STACKSIGHT_HANDSHAKE_INTERVAL);
             if($handshake_interval){
                 if(time() - $handshake_interval < self::STACKSIGHT_HANDSHAKE_INTERVAL_TIME){
-                    $manually_send = true;
-                } else{
                     $manually_send = false;
+                } else{
+                    $manually_send = true;
                 }
             } else{
                 $manually_send = true;
             }
-
             update_option(self::STACKSIGHT_HANDSHAKE_INTERVAL, time());
         }
 
