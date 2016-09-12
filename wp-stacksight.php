@@ -464,6 +464,8 @@ class WPStackSightPlugin {
             } else{
                 $manually_send = true;
             }
+
+            update_option(self::STACKSIGHT_HANDSHAKE_INTERVAL, time());
         }
 
         if(is_multisite()){
