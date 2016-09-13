@@ -715,6 +715,9 @@ class WPStackSightPlugin {
         $updated = false;
         if($upgrader && $extra){
             if ($extra['action'] == 'update') {
+                if(get_class($upgrader->skin->result) == 'WP_Error'){
+                    return;
+                }
                 $path = $upgrader->plugin_info();
                 $updated = get_plugin_data( $upgrader->skin->result['local_destination'] . '/' . $path, true, false );
             }
