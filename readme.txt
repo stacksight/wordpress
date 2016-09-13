@@ -3,7 +3,7 @@ Contributors: liorkesos, bora-89, igor-lemon, zstolar
 Tags: administration, activity, event, monitor, multisite, multi-users, log, logger, audit log, stats, security, tracking, woocommerce, notifications, email notifications
 Requires at least: 3.5
 Tested up to: 4.3
-Stable tag: 1.10.3
+Stable tag: 1.10.4
 License: GPLv2 or later
 
 
@@ -85,6 +85,12 @@ stacksight contributions can be done through submiting PRS to the [Github repo](
 
 
 == Changelog ==
+= 1.10.4 =
+- Add link to documentation with instruction how to init plugin
+- Fix bug with much clinking on the button for sending all data from all subdomains
+- Add time limits for handshake and sending all data from all subdomains
+- Changed handshake description
+
 = 1.10.3 =
 Fixed bugs with regular mode
 
