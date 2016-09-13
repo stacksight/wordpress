@@ -3,7 +3,7 @@
  * Plugin Name: Stacksight
  * Plugin URI: https://wordpress.org/plugins/stacksight/
  * Description: Stacksight wordpress support (featuring events, error logs and updates)
- * Version: 1.10.3
+ * Version: 1.10.4
  * Author: Stacksight LTD
  * Author URI: http://stacksight.io
  * License: GPL
@@ -35,10 +35,16 @@ class WPStackSightPlugin {
     const STACKSIGHT_HEALTH_QUEUE = 'stacksight_health_queue';
     const STACKSIGHT_HANDSHAKE_QUEUE = 'stacksight_handshake_queue';
 
+    const LAST_SENDS_ALL_DATA = 'stacksight_last_sends_all_data';
+    const LAST_SENDS_ALL_DATA_TIME = 60;
+
     const STACKISGHT_PATH = 'stacksight/wp-stacksight.php';
 //    const STACKISGHT_PATH = 'wp-super-cache/wp-cache.php';
 
     const MULTI_SENDS_UPDATES_PER_REQUEST = 10;
+
+    const STACKSIGHT_HANDSHAKE_INTERVAL = 'stacksight_handshake_interval';
+    const STACKSIGHT_HANDSHAKE_INTERVAL_TIME = 3600;
 
     public $defaultDefines = array(
         'STACKSIGHT_INCLUDE_LOGS' => false,
@@ -97,7 +103,7 @@ class WPStackSightPlugin {
             add_action('admin_init', array($this, 'page_init'));
             add_action('admin_notices', array($this, 'show_errors'));
             add_filter('plugin_action_links_' . plugin_basename(__FILE__), array($this, 'stacksight_plugin_action_links'));
-            add_action( 'admin_action_sends_all_data', array($this, 'sends_all_data_admin_action'));
+            add_action('admin_action_sends_all_data', array($this, 'sends_all_data_admin_action'));
         }
 
         if(defined('STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST')){
@@ -240,7 +246,7 @@ class WPStackSightPlugin {
         return $schedules;
     }
 
-    public function handshake($multiCurl = false, $host = false)
+    public function handshake($multiCurl = false, $host = false, $manually_send = false)
     {
         $total_state = $this->getTotalState($host);
         $total_hash_state = md5(serialize($total_state));
@@ -255,15 +261,17 @@ class WPStackSightPlugin {
             $old_hash_state = $tempory['hash_of_state'];
             $date_of_old_hash_state = $tempory['date_of_set'];
         }
+
         // If we have changed state
-        if($total_hash_state != $old_hash_state){
+        if($total_hash_state != $old_hash_state || $manually_send === true){
             $time = time();
             // Send new state
             $handshake_event = array(
                 'action' => ($old_hash_exist === true) ? 'updated' : 'registred',
                 'type' => 'stacksight',
                 'name' => 'configuration',
-                'data' => $total_state
+                'data' => $total_state,
+                'desc' => 'Information successfully received from your stack'
             );
 
             // Write new state to DB
@@ -374,7 +382,7 @@ class WPStackSightPlugin {
 
         SSUtilities::error_log('cron_do_main_job has been run', 'cron_log');
 
-        $this->sendHandshake(true, $host);
+        $this->sendHandshake(true, $host, true, false, true);
         // updates
         $this->sendUpdates(true, false, false, $host);
 
@@ -444,7 +452,22 @@ class WPStackSightPlugin {
         }
     }
 
-    public function sendHandshake($isMulticurl = true, $host = false, $use_queue = true){
+    public function sendHandshake($isMulticurl = true, $host = false, $use_queue = true, $manually_send = false, $send_from_curl = false){
+
+        if($send_from_curl == true){
+            $handshake_interval = get_option(self::STACKSIGHT_HANDSHAKE_INTERVAL);
+            if($handshake_interval){
+                if(time() - $handshake_interval < self::STACKSIGHT_HANDSHAKE_INTERVAL_TIME){
+                    $manually_send = false;
+                } else{
+                    $manually_send = true;
+                }
+            } else{
+                $manually_send = true;
+            }
+            update_option(self::STACKSIGHT_HANDSHAKE_INTERVAL, time());
+        }
+
         if(is_multisite()){
             $queue_json = get_option(self::STACKSIGHT_HANDSHAKE_QUEUE);
             if($queue_json){
@@ -453,19 +476,19 @@ class WPStackSightPlugin {
             if(isset($queue) && sizeof($queue) > 0 &&  $use_queue === true){
                 $blogs_array = $queue;
                 $slice_size = $this->stacksPerRequest;
-                $blogs = array_slice($blogs_array, 0 , $slice_size);
+                $blogs = array_slice($blogs_array, 0 , $slice_size - 1);
                 if(sizeof($blogs) > 0){
                     foreach($blogs as $blog){
-                        $this->handshake($isMulticurl, $blog);
+                        $this->handshake($isMulticurl, $blog, $manually_send);
                     }
                     $this->sliceQueue(self::STACKSIGHT_HANDSHAKE_QUEUE);
                 }
-//                $this->handshake($isMulticurl, $host);
+                $this->handshake($isMulticurl, $host, $manually_send);
             } else{
-                $this->handshake($isMulticurl, $host);
+                $this->handshake($isMulticurl, $host, $manually_send);
             }
         } else{
-            $this->handshake($isMulticurl, $host);
+            $this->handshake($isMulticurl, $host, $manually_send);
         }
     }
 
@@ -515,7 +538,11 @@ class WPStackSightPlugin {
                     } else{
                         update_option($param, json_encode(array()));
                     }
+                } else{
+                    update_option($param, json_encode(array()));
                 }
+            } else{
+                update_option($param, json_encode(array()));
             }
         }
     }
@@ -688,6 +715,11 @@ class WPStackSightPlugin {
         $updated = false;
         if($upgrader && $extra){
             if ($extra['action'] == 'update') {
+                if(isset($upgrader->skin->result) && is_object($upgrader->skin->result)){
+                    if(get_class($upgrader->skin->result) == 'WP_Error'){
+                        return;
+                    }
+                }
                 $path = $upgrader->plugin_info();
                 $updated = get_plugin_data( $upgrader->skin->result['local_destination'] . '/' . $path, true, false );
             }
@@ -861,8 +893,11 @@ class WPStackSightPlugin {
                     } else{
                         if(defined('STACKSIGHT_DEBUG') && STACKSIGHT_DEBUG === true){
                             define('STACKSIGHT_DEBUG_MODE',true);
-                            $_SESSION['stacksight_debug'] = array();
-                            $this->cron_do_main_job();
+                            if(!isset($_SESSION['stacksight_send_all_data']) || (isset($_SESSION['stacksight_send_all_data']) && $_SESSION['stacksight_send_all_data'] == false)){
+                                $_SESSION['stacksight_debug'] = array();
+                                $this->cron_do_main_job();
+                            }
+                            $_SESSION['stacksight_send_all_data'] = false;
                             $this->showDebugInfo();
                         }
                     }
@@ -878,17 +913,33 @@ class WPStackSightPlugin {
 
     public function sends_all_data_admin_action()
     {
-        $this->stacksPerRequest = 1000000;
-        $this->addToQueue(self::STACKSIGHT_HEALTH_QUEUE);
-        $this->addToQueue(self::STACKSIGHT_UPDATES_QUEUE);
-        $this->addToQueue(self::STACKSIGHT_INVENTORY_QUEUE);
-        $this->addToQueue(self::STACKSIGHT_HANDSHAKE_QUEUE);
-        $this->sendsAllData();
+        if(defined('STACKSIGHT_TOKEN') && !empty(STACKSIGHT_TOKEN)){
+
+            $last_running_time = get_option(self::LAST_SENDS_ALL_DATA);
+            if($last_running_time){
+                if(time() - $last_running_time < self::LAST_SENDS_ALL_DATA_TIME){
+                    SSUtilities::error_log("NEED LEFT TIME", 'error_log');
+                    wp_redirect($_SERVER['HTTP_REFERER']);
+                    exit();
+                }
+            }
+
+            update_option(self::LAST_SENDS_ALL_DATA, time());
+            $_SESSION['stacksight_send_all_data'] = true;
+            $this->stacksPerRequest = 1000000;
+            $this->addToQueue(self::STACKSIGHT_HEALTH_QUEUE);
+            $this->addToQueue(self::STACKSIGHT_UPDATES_QUEUE);
+            $this->addToQueue(self::STACKSIGHT_INVENTORY_QUEUE);
+            $this->addToQueue(self::STACKSIGHT_HANDSHAKE_QUEUE);
+            $this->sendsAllData();
+        } else {
+            wp_redirect($_SERVER['HTTP_REFERER']);
+            exit();
+        }
     }
 
     private  function sendsAllData(){
         $this->cron_do_main_job();
-
         $queue = get_option(self::STACKSIGHT_HANDSHAKE_QUEUE);
         if($queue){
             $queue_array = json_decode($queue);
@@ -907,11 +958,24 @@ class WPStackSightPlugin {
     private function showDebugInfo()
     {
         if(is_multisite() && is_main_site()){
+
+            $last_running_time = get_option(self::LAST_SENDS_ALL_DATA);
+            $enabled = '';
+            $title = 'Send data from all subsites';
+            if($last_running_time){
+                $tile_left = self::LAST_SENDS_ALL_DATA_TIME - (time() - $last_running_time);
+                if($tile_left > 0){
+                    $enabled = 'disabled="disabled"';
+                    $min = ceil($tile_left / 60);
+                    $title = 'Send data from all subsites. Left '.$min.' min';
+                }
+            }
+
             ?>
             <div id="sends-all-data">
                 <form method="POST" action="<?php echo admin_url( 'admin.php' ); ?>">
                     <input type="hidden" name="action" value="sends_all_data" />
-                    <input type="submit" class="button-primary" value="Send data from all subsites" />
+                    <input type="submit" class="button-primary" value="<?php echo $title;?>" <?php echo $enabled;?> />
                 </form>
             </div>
             <?php
@@ -1233,6 +1297,11 @@ class WPStackSightPlugin {
 
         if($upgrader && $extra){
             if ($extra['action'] == 'update') {
+                if(isset($upgrader->skin->result) && is_object($upgrader->skin->result)){
+                    if(get_class($upgrader->skin->result) == 'WP_Error'){
+                        return;
+                    }
+                }
                 $path = $upgrader->plugin_info();
                 $updated = get_plugin_data( $upgrader->skin->result['local_destination'] . '/' . $path, true, false );
             }
@@ -1428,9 +1497,14 @@ class WPStackSightPlugin {
             );
         }
 
+        $token_title = 'Access Token *';
+        if((defined('DOCS_URL') && !empty(DOCS_URL)) && (!defined('STACKSIGHT_TOKEN') || empty(STACKSIGHT_TOKEN))){
+            $token_title .= '<a href="'.DOCS_URL.'" class="howto" target="_blank">How to set?</a>';
+        }
+
         add_settings_field(
             'token',
-            'Access Token *',
+            $token_title,
             array( $this, 'token_callback' ),
             'stacksight-set-admin',
             'setting_section_stacksight'
@@ -1638,7 +1712,6 @@ class WPStackSightPlugin {
             );
         } else{
             if(!defined('STACKSIGHT_TOKEN')){
-                $link = (defined('DOCS_URL')) ? '<a href="'.DOCS_URL.'" target="_blank">How to set?</a>' : '';
                 printf(
                     '<span class="pre-code-red"> Not set </span>'.$link
                 );
