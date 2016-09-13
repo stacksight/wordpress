@@ -715,8 +715,10 @@ class WPStackSightPlugin {
         $updated = false;
         if($upgrader && $extra){
             if ($extra['action'] == 'update') {
-                if(get_class($upgrader->skin->result) == 'WP_Error'){
-                    return;
+                if(isset($upgrader->skin->result) && is_object($upgrader->skin->result)){
+                    if(get_class($upgrader->skin->result) == 'WP_Error'){
+                        return;
+                    }
                 }
                 $path = $upgrader->plugin_info();
                 $updated = get_plugin_data( $upgrader->skin->result['local_destination'] . '/' . $path, true, false );
@@ -1295,6 +1297,11 @@ class WPStackSightPlugin {
 
         if($upgrader && $extra){
             if ($extra['action'] == 'update') {
+                if(isset($upgrader->skin->result) && is_object($upgrader->skin->result)){
+                    if(get_class($upgrader->skin->result) == 'WP_Error'){
+                        return;
+                    }
+                }
                 $path = $upgrader->plugin_info();
                 $updated = get_plugin_data( $upgrader->skin->result['local_destination'] . '/' . $path, true, false );
             }
