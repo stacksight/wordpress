@@ -36,7 +36,7 @@ class WPStackSightPlugin {
     const STACKSIGHT_HANDSHAKE_QUEUE = 'stacksight_handshake_queue';
 
     const LAST_SENDS_ALL_DATA = 'stacksight_last_sends_all_data';
-    const LAST_SENDS_ALL_DATA_TIME = 900;
+    const LAST_SENDS_ALL_DATA_TIME = 60;
 
     const STACKISGHT_PATH = 'stacksight/wp-stacksight.php';
 //    const STACKISGHT_PATH = 'wp-super-cache/wp-cache.php';
