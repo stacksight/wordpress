@@ -270,7 +270,8 @@ class WPStackSightPlugin {
                 'action' => ($old_hash_exist === true) ? 'updated' : 'registred',
                 'type' => 'stacksight',
                 'name' => 'configuration',
-                'data' => $total_state
+                'data' => $total_state,
+                'desc' => 'Information successfully received from your stack'
             );
 
             // Write new state to DB
