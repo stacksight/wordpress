@@ -571,6 +571,7 @@ class WPStackSightPlugin {
 
     public function insert_log_mean($args)
     {
+        global $wpdb;
         if(defined('STACKSIGHT_INCLUDE_EVENTS') && STACKSIGHT_INCLUDE_EVENTS == true && defined('STACKSIGHT_ACTIVE_AAL') && STACKSIGHT_ACTIVE_AAL === true){
             $event = array();
 
