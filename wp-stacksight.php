@@ -680,7 +680,21 @@ class WPStackSightPlugin {
             }
 
             if($event){
-                $res = $this->ss_client->publishEvent($event);
+                if(is_multisite()){
+                    $blog_id = get_current_blog_id();
+                    $sql = $wpdb->prepare("SELECT blog_id, domain, path FROM $wpdb->blogs WHERE blog_id='".$blog_id."'", '');
+                    $blog_obj = $wpdb->get_results($sql);
+                    if(!empty($blog_obj) && isset($blog_obj[0])){
+                        $blog = $blog_obj[0];
+                        $path = substr($blog->path, 0, -1);
+                        $blog_domain = $blog->domain.$path;
+                        $res = $this->ss_client->publishEvent($event, false, $blog_domain);
+                    } else{
+                        $res = $this->ss_client->publishEvent($event);
+                    }
+                } else{
+                    $res = $this->ss_client->publishEvent($event);
+                }
             }
 
             if($ready_show_debug === true){
