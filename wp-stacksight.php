@@ -3,7 +3,7 @@
  * Plugin Name: Stacksight
  * Plugin URI: https://wordpress.org/plugins/stacksight/
  * Description: Stacksight wordpress support (featuring events, error logs and updates)
- * Version: 1.10.4
+ * Version: 1.10.5
  * Author: Stacksight LTD
  * Author URI: http://stacksight.io
  * License: GPL
@@ -918,7 +918,7 @@ class WPStackSightPlugin {
 
     public function sends_all_data_admin_action()
     {
-        if(defined('STACKSIGHT_TOKEN') && !empty(STACKSIGHT_TOKEN)){
+        if(defined('STACKSIGHT_TOKEN') && STACKSIGHT_TOKEN){
             $last_running_time = get_option(self::LAST_SENDS_ALL_DATA);
             if($last_running_time){
                 if(time() - $last_running_time < self::LAST_SENDS_ALL_DATA_TIME){
@@ -1520,7 +1520,7 @@ class WPStackSightPlugin {
         }
 
         $token_title = 'Access Token *';
-        if((defined('DOCS_URL') && !empty(DOCS_URL)) && (!defined('STACKSIGHT_TOKEN') || empty(STACKSIGHT_TOKEN))){
+        if((defined('DOCS_URL') && DOCS_URL) && (!defined('STACKSIGHT_TOKEN') || !STACKSIGHT_TOKEN)){
             $token_title .= '<a href="'.DOCS_URL.'" class="howto" target="_blank">How to set?</a>';
         }
 
