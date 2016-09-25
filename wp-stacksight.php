@@ -3,7 +3,7 @@
  * Plugin Name: Stacksight
  * Plugin URI: https://wordpress.org/plugins/stacksight/
  * Description: Stacksight wordpress support (featuring events, error logs and updates)
- * Version: 1.10.4
+ * Version: 1.10.5
  * Author: Stacksight LTD
  * Author URI: http://stacksight.io
  * License: GPL
@@ -382,6 +382,10 @@ class WPStackSightPlugin {
 
         SSUtilities::error_log('cron_do_main_job has been run', 'cron_log');
 
+        if($host === false){
+            $host = $this->getBlogDomainForSdk();
+        }
+
         $this->sendHandshake(true, $host, true, false, true);
         // updates
         $this->sendUpdates(true, false, false, $host);
@@ -571,6 +575,7 @@ class WPStackSightPlugin {
 
     public function insert_log_mean($args)
     {
+        global $wpdb;
         if(defined('STACKSIGHT_INCLUDE_EVENTS') && STACKSIGHT_INCLUDE_EVENTS == true && defined('STACKSIGHT_ACTIVE_AAL') && STACKSIGHT_ACTIVE_AAL === true){
             $event = array();
 
@@ -680,21 +685,7 @@ class WPStackSightPlugin {
             }
 
             if($event){
-                if(is_multisite()){
-                    $blog_id = get_current_blog_id();
-                    $sql = $wpdb->prepare("SELECT blog_id, domain, path FROM $wpdb->blogs WHERE blog_id='".$blog_id."'", '');
-                    $blog_obj = $wpdb->get_results($sql);
-                    if(!empty($blog_obj) && isset($blog_obj[0])){
-                        $blog = $blog_obj[0];
-                        $path = substr($blog->path, 0, -1);
-                        $blog_domain = $blog->domain.$path;
-                        $res = $this->ss_client->publishEvent($event, false, $blog_domain);
-                    } else{
-                        $res = $this->ss_client->publishEvent($event);
-                    }
-                } else{
-                    $res = $this->ss_client->publishEvent($event);
-                }
+                $res = $this->ss_client->publishEvent($event, false, $this->getBlogDomainForSdk());
             }
 
             if($ready_show_debug === true){
@@ -771,13 +762,13 @@ class WPStackSightPlugin {
                     }
                     $this->sliceQueue(self::STACKSIGHT_INVENTORY_QUEUE);
                 } else{
-                    $this->sendInventory($plugin_name, true, false, $action);
+                    $this->sendInventory($plugin_name, true, $this->getBlogDomainForSdk(), $action);
                 }
             } else{
-                $this->sendInventory($plugin_name, true, false, $action);
+                $this->sendInventory($plugin_name, true, $this->getBlogDomainForSdk(), $action);
             }
         } else{
-            $this->sendInventory($plugin_name, true, false, $action);
+            $this->sendInventory($plugin_name, true, $this->getBlogDomainForSdk(), $action);
         }
     }
 
@@ -927,8 +918,7 @@ class WPStackSightPlugin {
 
     public function sends_all_data_admin_action()
     {
-        if(defined('STACKSIGHT_TOKEN') && !empty(STACKSIGHT_TOKEN)){
-
+        if(defined('STACKSIGHT_TOKEN') && STACKSIGHT_TOKEN){
             $last_running_time = get_option(self::LAST_SENDS_ALL_DATA);
             if($last_running_time){
                 if(time() - $last_running_time < self::LAST_SENDS_ALL_DATA_TIME){
@@ -950,6 +940,24 @@ class WPStackSightPlugin {
             wp_redirect($_SERVER['HTTP_REFERER']);
             exit();
         }
+    }
+
+    private function getBlogDomainForSdk(){
+        global $wpdb;
+        if(is_multisite()){
+            $blog_id = get_current_blog_id();
+            $sql = $wpdb->prepare("SELECT blog_id, domain, path FROM $wpdb->blogs WHERE blog_id='".$blog_id."'", '');
+            $blog_obj = $wpdb->get_results($sql);
+            if(!empty($blog_obj) && isset($blog_obj[0])){
+                $blog = $blog_obj[0];
+                $path = substr($blog->path, 0, -1);
+                if($path != ''){
+                    $blog_domain = $blog->domain.$path;
+                    return $blog_domain;
+                }
+            }
+        }
+        return false;
     }
 
     private  function sendsAllData(){
@@ -1512,7 +1520,7 @@ class WPStackSightPlugin {
         }
 
         $token_title = 'Access Token *';
-        if((defined('DOCS_URL') && !empty(DOCS_URL)) && (!defined('STACKSIGHT_TOKEN') || empty(STACKSIGHT_TOKEN))){
+        if((defined('DOCS_URL') && DOCS_URL) && (!defined('STACKSIGHT_TOKEN') || !STACKSIGHT_TOKEN)){
             $token_title .= '<a href="'.DOCS_URL.'" class="howto" target="_blank">How to set?</a>';
         }
 
