@@ -1510,15 +1510,13 @@ class WPStackSightPlugin {
             'setting_section_stacksight'
         );
 
-        if(defined('STACKSIGHT_APP_ID')){
-            add_settings_field(
-                '_id',
-                'App ID',
-                array( $this, 'app_id_callback' ),
-                'stacksight-set-admin',
-                'setting_section_stacksight'
-            );
-        }
+        add_settings_field(
+            '_id',
+            'App ID',
+            array( $this, 'app_id_callback' ),
+            'stacksight-set-admin',
+            'setting_section_stacksight'
+        );
 
         $token_title = 'Access Token *';
         if((defined('DOCS_URL') && DOCS_URL) && (!defined('STACKSIGHT_TOKEN') || !STACKSIGHT_TOKEN)){
