@@ -61,7 +61,7 @@ class WPStackSightPlugin {
         register_activation_hook( __FILE__, array(__CLASS__, 'install'));
         register_deactivation_hook( __FILE__, array(__CLASS__, 'uninstall'));
 
-        $this->_setUpMultidomainsConfig(array('STACKSIGHT_PUBLIC_KEY', 'STACKSIGHT_PRIVATE_KEY', 'STACKSIGHT_GROUP'));
+        $this->_setUpMultidomainsConfig(array('STACKSIGHT_APP_ID', 'STACKSIGHT_TOKEN', 'STACKSIGHT_GROUP'));
 
         if(file_exists(ABSPATH .'wp-content/plugins/aryo-activity-log/aryo-activity-log.php')){
             if(is_plugin_active('aryo-activity-log/aryo-activity-log.php')){
@@ -73,10 +73,10 @@ class WPStackSightPlugin {
             define('STACKSIGHT_ACTIVE_AAL', false);
         }
 
-        if (defined('STACKSIGHT_PRIVATE_KEY') && defined('STACKSIGHT_BOOTSTRAPED')) {
-            $app_id = (defined('STACKSIGHT_PUBLIC_KEY')) ?  STACKSIGHT_PUBLIC_KEY : false;
+        if (defined('STACKSIGHT_TOKEN') && defined('STACKSIGHT_BOOTSTRAPED')) {
+            $app_id = (defined('STACKSIGHT_APP_ID')) ?  STACKSIGHT_APP_ID : false;
             $group = (defined('STACKSIGHT_GROUP')) ?  STACKSIGHT_GROUP : false;
-            $this->ss_client = new SSWordpressClient(STACKSIGHT_PRIVATE_KEY, SSClientBase::PLATFORM_WORDPRESS, $app_id, $group);
+            $this->ss_client = new SSWordpressClient(STACKSIGHT_TOKEN, SSClientBase::PLATFORM_WORDPRESS, $app_id, $group);
             add_filter('cron_schedules', array($this, 'cron_custom_interval'));
             if (function_exists('register_nav_menus')){
 
@@ -377,7 +377,7 @@ class WPStackSightPlugin {
 
     public function cron_do_main_job($host = false)
     {
-        if(!defined('STACKSIGHT_PRIVATE_KEY') || !isset($this->ss_client) || !$this->ss_client)
+        if(!defined('STACKSIGHT_TOKEN') || !isset($this->ss_client) || !$this->ss_client)
             return;
 
         SSUtilities::error_log('cron_do_main_job has been run', 'cron_log');
@@ -918,7 +918,7 @@ class WPStackSightPlugin {
 
     public function sends_all_data_admin_action()
     {
-        if(defined('STACKSIGHT_PRIVATE_KEY') && STACKSIGHT_PRIVATE_KEY){
+        if(defined('STACKSIGHT_TOKEN') && STACKSIGHT_TOKEN){
             $last_running_time = get_option(self::LAST_SENDS_ALL_DATA);
             if($last_running_time){
                 if(time() - $last_running_time < self::LAST_SENDS_ALL_DATA_TIME){
@@ -1440,15 +1440,6 @@ class WPStackSightPlugin {
             'stacksight-set-admin' // Page
         );
 
-        $title = (defined('stacksight_logs_title')) ? stacksight_logs_title : 'Include Logs';
-        add_settings_field(
-            'include_logs',
-            $title,
-            array( $this, 'include_logs_callback' ),
-            'stacksight-set-features',
-            'setting_section_stacksight'
-        );
-
         $title = (defined('stacksight_health_title')) ? stacksight_health_title : 'Include Health';
         add_settings_field(
             'include_health',
@@ -1485,6 +1476,16 @@ class WPStackSightPlugin {
             'setting_section_stacksight'
         );
 
+
+        $title = (defined('stacksight_logs_title')) ? stacksight_logs_title : 'Include Logs (<i>Beta</i>)';
+        add_settings_field(
+            'include_logs',
+            $title,
+            array( $this, 'include_logs_callback' ),
+            'stacksight-set-features',
+            'setting_section_stacksight'
+        );
+
         add_settings_field(
             'slack_url',
             'Webhook incoming URL',
@@ -1509,7 +1510,7 @@ class WPStackSightPlugin {
             'setting_section_stacksight'
         );
 
-        if(defined('STACKSIGHT_PUBLIC_KEY')){
+        if(defined('STACKSIGHT_APP_ID')){
             add_settings_field(
                 '_id',
                 'App ID',
@@ -1520,7 +1521,7 @@ class WPStackSightPlugin {
         }
 
         $token_title = 'Access Token *';
-        if((defined('DOCS_URL') && DOCS_URL) && (!defined('STACKSIGHT_PRIVATE_KEY') || !STACKSIGHT_PRIVATE_KEY)){
+        if((defined('DOCS_URL') && DOCS_URL) && (!defined('STACKSIGHT_TOKEN') || !STACKSIGHT_TOKEN)){
             $token_title .= '<a href="'.DOCS_URL.'" class="howto" target="_blank">How to set?</a>';
         }
 
@@ -1572,7 +1573,7 @@ class WPStackSightPlugin {
     {
         $new_input = array();
 
-        if(!defined('STACKSIGHT_PRIVATE_KEY')) add_settings_error('token', 'token', '"App Acces Token" can not be empty');
+        if(!defined('STACKSIGHT_TOKEN')) add_settings_error('token', 'token', '"App Acces Token" can not be empty');
 
         $any_errors = $this->any_form_errors();
         if($any_errors)  $this->show_errors();
@@ -1711,13 +1712,13 @@ class WPStackSightPlugin {
                 isset( $this->options['_id'] ) ? esc_attr( $this->options['_id']) : ''
             );
         } else{
-            if(!defined('STACKSIGHT_PUBLIC_KEY')){
+            if(!defined('STACKSIGHT_APP_ID')){
                 printf(
                     '<span class="pre-code-green"> Is calculated </span>'
                 );
             } else {
                 printf(
-                    '<span>'.STACKSIGHT_PUBLIC_KEY.'</span>'
+                    '<span>'.STACKSIGHT_APP_ID.'</span>'
                 );
             }
         }
@@ -1733,13 +1734,13 @@ class WPStackSightPlugin {
                 isset( $this->options['token'] ) ? esc_attr( $this->options['token']) : ''
             );
         } else{
-            if(!defined('STACKSIGHT_PRIVATE_KEY')){
+            if(!defined('STACKSIGHT_TOKEN')){
                 printf(
                     '<span class="pre-code-red"> Not set </span>'.$link
                 );
             } else {
                 printf(
-                    '<span>'.STACKSIGHT_PRIVATE_KEY.'</span><input type="hidden" name="stacksight_opt[token]" value="'.STACKSIGHT_PRIVATE_KEY.'">'
+                    '<span>'.STACKSIGHT_TOKEN.'</span><input type="hidden" name="stacksight_opt[token]" value="'.STACKSIGHT_TOKEN.'">'
                 );
             }
         }
@@ -1886,7 +1887,7 @@ class WPStackSightPlugin {
         $list = array();
         $show_code = false;
 
-        if (!defined('STACKSIGHT_PRIVATE_KEY')) {
+        if (!defined('STACKSIGHT_TOKEN')) {
             $list[] = __('Token doesn\'t exist', 'stacksight').'<br>';
             $show_code = true;
         }
@@ -2044,8 +2045,8 @@ class WPStackSightPlugin {
         return array(
             'app' => $plugin_info,
             'settings' => array(
-                'app_id' => (defined('STACKSIGHT_PUBLIC_KEY')) ? STACKSIGHT_PUBLIC_KEY : false,
-                'app_token' => (defined('STACKSIGHT_PRIVATE_KEY')) ? STACKSIGHT_PRIVATE_KEY : false,
+                'app_id' => (defined('STACKSIGHT_APP_ID')) ? STACKSIGHT_APP_ID : false,
+                'app_token' => (defined('STACKSIGHT_TOKEN')) ? STACKSIGHT_TOKEN : false,
                 'app_group' => (defined('STACKSIGHT_GROUP')) ? STACKSIGHT_GROUP : false,
                 'debug_mode' => (defined('STACKSIGHT_DEBUG')) ? STACKSIGHT_DEBUG : false
             ),
