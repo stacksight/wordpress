@@ -61,7 +61,7 @@ class WPStackSightPlugin {
         register_activation_hook( __FILE__, array(__CLASS__, 'install'));
         register_deactivation_hook( __FILE__, array(__CLASS__, 'uninstall'));
 
-        $this->_setUpMultidomainsConfig(array('STACKSIGHT_APP_ID', 'STACKSIGHT_TOKEN', 'STACKSIGHT_GROUP'));
+        $this->_setUpMultidomainsConfig(array('STACKSIGHT_APP_ID', 'STACKSIGHT_TOKEN'));
 
         if(file_exists(ABSPATH .'wp-content/plugins/aryo-activity-log/aryo-activity-log.php')){
             if(is_plugin_active('aryo-activity-log/aryo-activity-log.php')){
@@ -75,8 +75,7 @@ class WPStackSightPlugin {
 
         if (defined('STACKSIGHT_TOKEN') && defined('STACKSIGHT_BOOTSTRAPED')) {
             $app_id = (defined('STACKSIGHT_APP_ID')) ?  STACKSIGHT_APP_ID : false;
-            $group = (defined('STACKSIGHT_GROUP')) ?  STACKSIGHT_GROUP : false;
-            $this->ss_client = new SSWordpressClient(STACKSIGHT_TOKEN, SSClientBase::PLATFORM_WORDPRESS, $app_id, $group);
+            $this->ss_client = new SSWordpressClient(STACKSIGHT_TOKEN, SSClientBase::PLATFORM_WORDPRESS, $app_id);
             add_filter('cron_schedules', array($this, 'cron_custom_interval'));
             if (function_exists('register_nav_menus')){
 
@@ -1531,14 +1530,6 @@ class WPStackSightPlugin {
             'setting_section_stacksight'
         );
 
-        add_settings_field(
-            'group',
-            'App Group',
-            array( $this, 'group_callback' ),
-            'stacksight-set-admin',
-            'setting_section_stacksight'
-        );
-
         /*
         add_settings_field(
             'enable_options',
@@ -1739,26 +1730,6 @@ class WPStackSightPlugin {
             } else {
                 printf(
                     '<span>'.STACKSIGHT_TOKEN.'</span><input type="hidden" name="stacksight_opt[token]" value="'.STACKSIGHT_TOKEN.'">'
-                );
-            }
-        }
-    }
-
-    public function group_callback()
-    {
-        if(defined('STACKSIGHT_SETTINGS_IN_DB') && STACKSIGHT_SETTINGS_IN_DB === true){
-            printf(
-                '<input type="text" id="group" name="stacksight_opt[group]" value="%s" size="50" />',
-                isset( $this->options['group'] ) ? esc_attr( $this->options['group']) : ''
-            );
-        } else{
-            if(!defined('STACKSIGHT_GROUP')){
-                printf(
-                    '<span class="pre-code-red"> Not set </span>'
-                );
-            } else {
-                printf(
-                    '<span>'.STACKSIGHT_GROUP.'</span>'
                 );
             }
         }
@@ -2045,7 +2016,6 @@ class WPStackSightPlugin {
             'settings' => array(
                 'app_id' => (defined('STACKSIGHT_APP_ID')) ? STACKSIGHT_APP_ID : false,
                 'app_token' => (defined('STACKSIGHT_TOKEN')) ? STACKSIGHT_TOKEN : false,
-                'app_group' => (defined('STACKSIGHT_GROUP')) ? STACKSIGHT_GROUP : false,
                 'debug_mode' => (defined('STACKSIGHT_DEBUG')) ? STACKSIGHT_DEBUG : false
             ),
             'features' => array(
