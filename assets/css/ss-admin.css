@@ -113,7 +113,7 @@
 .debug-table{
     margin-bottom: 40px;
 }
-#sends-all-data{
+#sends-all-data, #init-all-subsites{
     text-align: center;
     margin: 0 auto;
     padding: 22px 10px 10px 10px;

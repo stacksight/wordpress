@@ -26,6 +26,8 @@ class WPStackSightPlugin {
     private $health;
     private $dep_plugins = array();
 
+    const API_URL_INIT_SUBSITES = 'https://api.stage.stacksight.io/v0.1/stacks/register/wordpress';
+
     const ACTION_ACTIVATE_DEACTIVATE = 'action_activate_deactivate';
     const ACTION_REMOVE = 'action_remove';
     const ACTION_INSTALL_UPDATES = 'action_install_updates';
@@ -103,6 +105,7 @@ class WPStackSightPlugin {
             add_action('admin_notices', array($this, 'show_errors'));
             add_filter('plugin_action_links_' . plugin_basename(__FILE__), array($this, 'stacksight_plugin_action_links'));
             add_action('admin_action_sends_all_data', array($this, 'sends_all_data_admin_action'));
+            add_action('admin_action_init_all_subsites', array($this, 'init_all_subsites_admin_action'));
         }
 
         if(defined('STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST')){
@@ -115,9 +118,11 @@ class WPStackSightPlugin {
 
     public function stacksightAddNewBlog($blog_id, $user_id, $domain, $path, $site_id, $meta)
     {
-        $this->cron_do_main_job($domain);
-        $this->sendInventory(false, true, $domain);
-        $this->ss_client->sendMultiCURL();
+        if($this->initSubsiteParamsAfterAddEvent($blog_id)){
+            $this->cron_do_main_job($domain);
+            $this->sendInventory(false, true, $domain);
+            $this->ss_client->sendMultiCURL();
+        }
     }
 
     public function action_updated_option($option, $old_value, $value)
@@ -245,9 +250,9 @@ class WPStackSightPlugin {
         return $schedules;
     }
 
-    public function handshake($multiCurl = false, $host = false, $manually_send = false)
+    public function handshake($multiCurl = false, $blog = false, $manually_send = false)
     {
-        $total_state = $this->getTotalState($host);
+        $total_state = $this->getTotalState($blog['domain']);
         $total_hash_state = md5(serialize($total_state));
         $old_hash_exist = false;
         $old_hash_state = false;
@@ -284,7 +289,10 @@ class WPStackSightPlugin {
             } else{
                 add_option('stacksight_state', serialize($new_state_to_db));
             }
-            $this->ss_client->publishEvent($handshake_event, $multiCurl, $host);
+            if(isset($blog['id']) && !empty($blog['id'])){
+                $this->inplementMultisiteParams($blog['id'], $handshake_event);
+            }
+            $this->ss_client->publishEvent($handshake_event, $multiCurl, $blog['domain']);
         }
     }
 
@@ -367,7 +375,8 @@ class WPStackSightPlugin {
             $blogs = array_slice($blogs_array, 0 , $slice_size);
             if(sizeof($blogs) > 0){
                 foreach($blogs as $blog){
-                    $this->ss_client->sendHealth($health, $multisite, $blog);
+                    $this->inplementMultisiteParams($blog->id, $health);
+                    $this->ss_client->sendHealth($health, $multisite, $blog->domain);
                 }
             }
             $this->sliceQueue(self::STACKSIGHT_HEALTH_QUEUE);
@@ -482,16 +491,16 @@ class WPStackSightPlugin {
                 $blogs = array_slice($blogs_array, 0 , $slice_size - 1);
                 if(sizeof($blogs) > 0){
                     foreach($blogs as $blog){
-                        $this->handshake($isMulticurl, $blog, $manually_send);
+                        $this->handshake($isMulticurl, array('id' => $blog->id, 'domain' => $blog->domain), $manually_send);
                     }
                     $this->sliceQueue(self::STACKSIGHT_HANDSHAKE_QUEUE);
                 }
-                $this->handshake($isMulticurl, $host, $manually_send);
+                $this->handshake($isMulticurl, array('domain' => $host), $manually_send);
             } else{
-                $this->handshake($isMulticurl, $host, $manually_send);
+                $this->handshake($isMulticurl, array('domain' => $host), $manually_send);
             }
         } else{
-            $this->handshake($isMulticurl, $host, $manually_send);
+            $this->handshake($isMulticurl, array('domain' => $host), $manually_send);
         }
     }
 
@@ -512,7 +521,8 @@ class WPStackSightPlugin {
                     $blogs = array_slice($blogs_array, 0 , $slice_size);
                     if(sizeof($blogs) > 0){
                         foreach($blogs as $blog){
-                            $this->ss_client->sendUpdates($updates, $multiCurl, $blog);
+                            $this->inplementMultisiteParams($blog->id, $updates);
+                            $this->ss_client->sendUpdates($updates, $multiCurl, $blog->domain);
                         }
                         $this->sliceQueue(self::STACKSIGHT_UPDATES_QUEUE);
                     }
@@ -559,7 +569,7 @@ class WPStackSightPlugin {
             $blogs_array = array();
             foreach($blogs as $blog) {
                 $path = substr($blog->path, 0, -1);
-                $blogs_array[] = $blog->domain.$path;
+                $blogs_array[] = array('id' => $blog->blog_id, 'domain' => $blog->domain.$path);
             }
 
             $param_db = get_option($param);
@@ -711,6 +721,13 @@ class WPStackSightPlugin {
             '',
             '80.2'
         );
+        add_options_page('Notice on Dashboard', 'Notice on Dashboard','manage_options','sna-a-dashboard','sna_show_notice_dashboard');
+    }
+
+    function sna_show_notice_dashboard()
+    {
+        update_option('sts_error_notice','');
+        update_option('sts_success_notice','');
     }
 
     public function sendInventories($plugin_name = false, $action = false, $multicurl = false, $upgrader = false, $extra = false, $network_wide = false)
@@ -736,27 +753,14 @@ class WPStackSightPlugin {
                 $slice_size = $this->stacksPerRequest;
                 $blogs = array_slice($blogs_array, 0 , $slice_size);
                 if(sizeof($blogs) > 0){
-                    $sql = $wpdb->prepare("SELECT blog_id, domain, path FROM $wpdb->blogs WHERE archived='0' AND deleted ='0'", '');
-                    $blogs_db = $wpdb->get_results($sql);
-                    if($blogs_db){
-                        $blogs_assoc_array = array();
-                        foreach($blogs_db as $blog) {
-                            $path = substr($blog->path, 0, -1);
-                            $blogs_assoc_array[$blog->domain.$path] = $blog->blog_id;
-                        }
-                    }
                     foreach($blogs as $blog){
-                        if(isset($blogs_assoc_array[$blog])){
-                            $blog_id = $blogs_assoc_array[$blog];
-                        } else{
-                            $blog_id = false;
-                        }
-                        $inventory =  $this->getInventory($plugin_name, $action, $blog_id, $updated, false, $network_wide);
+                        $inventory =  $this->getInventory($plugin_name, $action, $blog->id, $updated, false, $network_wide);
                         if (!empty($inventory)) {
                             $data = array(
                                 'data' => $inventory
                             );
-                            $this->ss_client->sendInventory($data, true, $blog);
+                            $this->inplementMultisiteParams($blog->id, $data);
+                            $this->ss_client->sendInventory($data, true, $blog->domain);
                         }
                     }
                     $this->sliceQueue(self::STACKSIGHT_INVENTORY_QUEUE);
@@ -768,6 +772,20 @@ class WPStackSightPlugin {
             }
         } else{
             $this->sendInventory($plugin_name, true, $this->getBlogDomainForSdk(), $action);
+        }
+    }
+
+    private function inplementMultisiteParams($blog_id, &$data){
+        $blog_options = get_blog_option($blog_id, 'stacksight_opt');
+        if($blog_options && is_array($blog_options)){
+            if(isset($blog_options['_id']) && !empty($blog_options['_id'])){
+                $data['appId'] = $blog_options['_id'];
+            }
+        }
+        if($blog_options && is_array($blog_options)){
+            if(isset($blog_options['token']) && !empty($blog_options['token'])){
+                $data['token'] = $blog_options['token'];
+            }
         }
     }
 
@@ -882,6 +900,11 @@ class WPStackSightPlugin {
                         <a href="?page=stacksight&tab=debug_mode" class="nav-tab <?php echo $active_tab == 'debug_mode' ? 'nav-tab-active' : ''; ?>">Debug</a>
                     <?php endif;?>
                 </h2>
+                <?php
+                    if( $active_tab == 'general_settings' ) {
+                        $this->initSubSites();
+                    }
+                ?>
                 <form method="post" action="options.php">
                     <?php
                     if( $active_tab == 'general_settings' ) {
@@ -907,12 +930,98 @@ class WPStackSightPlugin {
                     }
                     if($active_tab != 'debug_mode')
                         submit_button();
+
+                    update_option('sts_error_notice', '');
+                    update_option('sts_success_notice', '');
                     ?>
                 </form>
 
             </div><!-- /.wrap -->
         </div>
         <?php
+    }
+
+    private function initSubsiteParamsAfterAddEvent($blog_id){
+        $blog = get_blog_details($blog_id);
+        $siteurl = get_blog_option($blog->blog_id, 'siteurl', false);
+        $blogname = get_blog_option($blog->blog_id, 'blogname', false);
+        $result_obj = array();
+        $result_obj['sites'][] = array(
+            'domain' => $blog->domain,
+            'host' => $siteurl,
+            'id' => $blog->blog_id,
+            'title' => $blogname
+        );
+        $apps_ids = $this->_sendInitSubsitesRequest($result_obj);
+        if($apps_ids){
+            $results = json_decode($apps_ids);
+            if(!isset($results->message)){
+                foreach($results as $key => $result){
+                    update_blog_option($key, 'stacksight_opt', array('_id' => $result, 'token' => STACKSIGHT_TOKEN));
+                }
+                return true;
+            } else{
+                return false;
+            }
+        }
+        return false;
+    }
+
+    public function init_all_subsites_admin_action()
+    {
+        global $wpdb;
+        if(!defined('STACKSIGHT_TOKEN')){
+            return new WP_Error('broke', __( "Need to set token"));
+            wp_redirect($_SERVER['HTTP_REFERER']);
+            exit();
+        }
+
+        update_option('sts_error_notice', '');
+        update_option('sts_success_notice', '');
+
+        $blogs = $wpdb->get_results( "SELECT * FROM $wpdb->blogs WHERE public = '1' AND deleted = '0'");
+        $result = array();
+        foreach ($blogs as $blog){
+            $siteurl = get_blog_option($blog->blog_id, 'siteurl', false);
+            $blogname = get_blog_option($blog->blog_id, 'blogname', false);
+            $tmp = array(
+                'domain' => $blog->domain,
+                'host' => $siteurl,
+                'id' => $blog->blog_id,
+                'title' => $blogname
+            );
+            if(is_main_site($blog->blog_id)){
+                $tmp['type'] = 'main';
+            }
+            $result['sites'][] = $tmp;
+        }
+        $apps_ids = $this->_sendInitSubsitesRequest($result);
+        if($apps_ids){
+            $results = json_decode($apps_ids);
+            if(!isset($results->message)){
+                foreach($results as $key => $result){
+                    update_blog_option($key, 'stacksight_opt', array('_id' => $result, 'token' => STACKSIGHT_TOKEN));
+                }
+                update_option('sts_success_notice', 'Stacksight: Application IDs set success for all subsites.');
+            } else{
+                update_option('sts_error_notice', 'Stacksight error: '.$results->message);
+            }
+        }
+
+        wp_redirect($_SERVER['HTTP_REFERER']);
+    }
+
+    private function _sendInitSubsitesRequest($data){
+        $ch = curl_init(self::API_URL_INIT_SUBSITES);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+        curl_setopt($ch, CURLOPT_FRESH_CONNECT, true);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+                'Content-Type: application/json',
+                'Authorization: ' .STACKSIGHT_TOKEN
+        ));
+        return curl_exec($ch);
     }
 
     public function sends_all_data_admin_action()
@@ -976,10 +1085,22 @@ class WPStackSightPlugin {
         }
     }
 
+    private function initSubSites(){
+        if(is_multisite() && is_main_site() && defined('STACKSIGHT_TOKEN')){
+            ?>
+            <div id="init-all-subsites">
+                <form method="POST" action="<?php echo admin_url( 'admin.php' ); ?>">
+                    <input type="hidden" name="action" value="init_all_subsites" />
+                    <input type="submit" class="button-primary" value="Set application IDs for all subsites"/>
+                </form>
+            </div>
+            <?php
+        }
+    }
+
     private function showDebugInfo()
     {
         if(is_multisite() && is_main_site()){
-
             $last_running_time = get_option(self::LAST_SENDS_ALL_DATA);
             $enabled = '';
             $title = 'Send data from all subsites';
@@ -1812,7 +1933,20 @@ class WPStackSightPlugin {
      */
     public function show_errors()
     {
-        settings_errors();
+        $urngent_notices = get_option('sts_error_notice');
+        $norml_notices = get_option('sts_success_notice');
+
+        if($urngent_notices || $norml_notices){
+            if(!empty($urngent_notices)){
+                echo '<div class="error notice is-dismissible" id="message"><p>'.$urngent_notices.'</p></div>';
+            }
+
+            if(!empty($norml_notices)){
+                echo '<div class="updated notice is-dismissible" id="message"><p>'.$norml_notices.'</p></div>';
+            }
+        } else{
+            settings_errors();
+        }
     }
 
     /**
