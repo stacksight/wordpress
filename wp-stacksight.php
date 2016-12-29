@@ -979,7 +979,7 @@ class WPStackSightPlugin {
         update_option('sts_error_notice', '');
         update_option('sts_success_notice', '');
 
-        $blogs = $wpdb->get_results( "SELECT * FROM $wpdb->blogs WHERE public = '1' AND deleted = '0'");
+        $blogs = $wpdb->get_results( "SELECT * FROM $wpdb->blogs WHERE deleted = '0'");
         $result = array();
         foreach ($blogs as $blog){
             $siteurl = get_blog_option($blog->blog_id, 'siteurl', false);
