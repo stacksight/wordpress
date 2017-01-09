@@ -26,8 +26,6 @@ class WPStackSightPlugin {
     private $health;
     private $dep_plugins = array();
 
-    const API_URL_INIT_SUBSITES = 'https://api.stage.stacksight.io/v0.1/stacks/register/wordpress';
-
     const ACTION_ACTIVATE_DEACTIVATE = 'action_activate_deactivate';
     const ACTION_REMOVE = 'action_remove';
     const ACTION_INSTALL_UPDATES = 'action_install_updates';
@@ -1012,7 +1010,8 @@ class WPStackSightPlugin {
     }
 
     private function _sendInitSubsitesRequest($data){
-        $ch = curl_init(self::API_URL_INIT_SUBSITES);
+        $url = new SSHttpRequest();
+        $ch = curl_init($url->getInitIdsUrl('wordpress'));
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
         curl_setopt($ch, CURLOPT_FRESH_CONNECT, true);
