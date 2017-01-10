@@ -61,7 +61,7 @@ class WPStackSightPlugin {
         register_activation_hook( __FILE__, array(__CLASS__, 'install'));
         register_deactivation_hook( __FILE__, array(__CLASS__, 'uninstall'));
 
-        $this->_setUpMultidomainsConfig(array('STACKSIGHT_PUBLIC_KEY', 'STACKSIGHT_PRIVATE_KEY', 'STACKSIGHT_GROUP'));
+        $this->_setUpMultidomainsConfig(array('STACKSIGHT_APP_ID', 'STACKSIGHT_TOKEN'));
 
         if(file_exists(ABSPATH .'wp-content/plugins/aryo-activity-log/aryo-activity-log.php')){
             if(is_plugin_active('aryo-activity-log/aryo-activity-log.php')){
@@ -73,10 +73,9 @@ class WPStackSightPlugin {
             define('STACKSIGHT_ACTIVE_AAL', false);
         }
 
-        if (defined('STACKSIGHT_PRIVATE_KEY') && defined('STACKSIGHT_BOOTSTRAPED')) {
-            $app_id = (defined('STACKSIGHT_PUBLIC_KEY')) ?  STACKSIGHT_PUBLIC_KEY : false;
-            $group = (defined('STACKSIGHT_GROUP')) ?  STACKSIGHT_GROUP : false;
-            $this->ss_client = new SSWordpressClient(STACKSIGHT_PRIVATE_KEY, SSClientBase::PLATFORM_WORDPRESS, $app_id, $group);
+        if (defined('STACKSIGHT_TOKEN') && defined('STACKSIGHT_BOOTSTRAPED')) {
+            $app_id = (defined('STACKSIGHT_APP_ID')) ?  STACKSIGHT_APP_ID : false;
+            $this->ss_client = new SSWordpressClient(STACKSIGHT_TOKEN, SSClientBase::PLATFORM_WORDPRESS, $app_id);
             add_filter('cron_schedules', array($this, 'cron_custom_interval'));
             if (function_exists('register_nav_menus')){
 
@@ -104,6 +103,7 @@ class WPStackSightPlugin {
             add_action('admin_notices', array($this, 'show_errors'));
             add_filter('plugin_action_links_' . plugin_basename(__FILE__), array($this, 'stacksight_plugin_action_links'));
             add_action('admin_action_sends_all_data', array($this, 'sends_all_data_admin_action'));
+            add_action('admin_action_init_all_subsites', array($this, 'init_all_subsites_admin_action'));
         }
 
         if(defined('STACKSIGHT_MULTI_SENDS_UPDATES_PER_REQUEST')){
@@ -116,9 +116,11 @@ class WPStackSightPlugin {
 
     public function stacksightAddNewBlog($blog_id, $user_id, $domain, $path, $site_id, $meta)
     {
-        $this->cron_do_main_job($domain);
-        $this->sendInventory(false, true, $domain);
-        $this->ss_client->sendMultiCURL();
+        if($this->initSubsiteParamsAfterAddEvent($blog_id)){
+            $this->cron_do_main_job($domain);
+            $this->sendInventory(false, true, $domain);
+            $this->ss_client->sendMultiCURL();
+        }
     }
 
     public function action_updated_option($option, $old_value, $value)
@@ -246,9 +248,9 @@ class WPStackSightPlugin {
         return $schedules;
     }
 
-    public function handshake($multiCurl = false, $host = false, $manually_send = false)
+    public function handshake($multiCurl = false, $blog = false, $manually_send = false)
     {
-        $total_state = $this->getTotalState($host);
+        $total_state = $this->getTotalState($blog['domain']);
         $total_hash_state = md5(serialize($total_state));
         $old_hash_exist = false;
         $old_hash_state = false;
@@ -285,7 +287,10 @@ class WPStackSightPlugin {
             } else{
                 add_option('stacksight_state', serialize($new_state_to_db));
             }
-            $this->ss_client->publishEvent($handshake_event, $multiCurl, $host);
+            if(isset($blog['id']) && !empty($blog['id'])){
+                $this->inplementMultisiteParams($blog['id'], $handshake_event);
+            }
+            $this->ss_client->publishEvent($handshake_event, $multiCurl, $blog['domain']);
         }
     }
 
@@ -368,7 +373,8 @@ class WPStackSightPlugin {
             $blogs = array_slice($blogs_array, 0 , $slice_size);
             if(sizeof($blogs) > 0){
                 foreach($blogs as $blog){
-                    $this->ss_client->sendHealth($health, $multisite, $blog);
+                    $this->inplementMultisiteParams($blog->id, $health);
+                    $this->ss_client->sendHealth($health, $multisite, $blog->domain);
                 }
             }
             $this->sliceQueue(self::STACKSIGHT_HEALTH_QUEUE);
@@ -377,7 +383,7 @@ class WPStackSightPlugin {
 
     public function cron_do_main_job($host = false)
     {
-        if(!defined('STACKSIGHT_PRIVATE_KEY') || !isset($this->ss_client) || !$this->ss_client)
+        if(!defined('STACKSIGHT_TOKEN') || !isset($this->ss_client) || !$this->ss_client)
             return;
 
         SSUtilities::error_log('cron_do_main_job has been run', 'cron_log');
@@ -483,16 +489,16 @@ class WPStackSightPlugin {
                 $blogs = array_slice($blogs_array, 0 , $slice_size - 1);
                 if(sizeof($blogs) > 0){
                     foreach($blogs as $blog){
-                        $this->handshake($isMulticurl, $blog, $manually_send);
+                        $this->handshake($isMulticurl, array('id' => $blog->id, 'domain' => $blog->domain), $manually_send);
                     }
                     $this->sliceQueue(self::STACKSIGHT_HANDSHAKE_QUEUE);
                 }
-                $this->handshake($isMulticurl, $host, $manually_send);
+                $this->handshake($isMulticurl, array('domain' => $host), $manually_send);
             } else{
-                $this->handshake($isMulticurl, $host, $manually_send);
+                $this->handshake($isMulticurl, array('domain' => $host), $manually_send);
             }
         } else{
-            $this->handshake($isMulticurl, $host, $manually_send);
+            $this->handshake($isMulticurl, array('domain' => $host), $manually_send);
         }
     }
 
@@ -513,7 +519,8 @@ class WPStackSightPlugin {
                     $blogs = array_slice($blogs_array, 0 , $slice_size);
                     if(sizeof($blogs) > 0){
                         foreach($blogs as $blog){
-                            $this->ss_client->sendUpdates($updates, $multiCurl, $blog);
+                            $this->inplementMultisiteParams($blog->id, $updates);
+                            $this->ss_client->sendUpdates($updates, $multiCurl, $blog->domain);
                         }
                         $this->sliceQueue(self::STACKSIGHT_UPDATES_QUEUE);
                     }
@@ -560,7 +567,7 @@ class WPStackSightPlugin {
             $blogs_array = array();
             foreach($blogs as $blog) {
                 $path = substr($blog->path, 0, -1);
-                $blogs_array[] = $blog->domain.$path;
+                $blogs_array[] = array('id' => $blog->blog_id, 'domain' => $blog->domain.$path);
             }
 
             $param_db = get_option($param);
@@ -712,6 +719,13 @@ class WPStackSightPlugin {
             '',
             '80.2'
         );
+        add_options_page('Notice on Dashboard', 'Notice on Dashboard','manage_options','sna-a-dashboard','sna_show_notice_dashboard');
+    }
+
+    function sna_show_notice_dashboard()
+    {
+        update_option('sts_error_notice','');
+        update_option('sts_success_notice','');
     }
 
     public function sendInventories($plugin_name = false, $action = false, $multicurl = false, $upgrader = false, $extra = false, $network_wide = false)
@@ -737,27 +751,14 @@ class WPStackSightPlugin {
                 $slice_size = $this->stacksPerRequest;
                 $blogs = array_slice($blogs_array, 0 , $slice_size);
                 if(sizeof($blogs) > 0){
-                    $sql = $wpdb->prepare("SELECT blog_id, domain, path FROM $wpdb->blogs WHERE archived='0' AND deleted ='0'", '');
-                    $blogs_db = $wpdb->get_results($sql);
-                    if($blogs_db){
-                        $blogs_assoc_array = array();
-                        foreach($blogs_db as $blog) {
-                            $path = substr($blog->path, 0, -1);
-                            $blogs_assoc_array[$blog->domain.$path] = $blog->blog_id;
-                        }
-                    }
                     foreach($blogs as $blog){
-                        if(isset($blogs_assoc_array[$blog])){
-                            $blog_id = $blogs_assoc_array[$blog];
-                        } else{
-                            $blog_id = false;
-                        }
-                        $inventory =  $this->getInventory($plugin_name, $action, $blog_id, $updated, false, $network_wide);
+                        $inventory =  $this->getInventory($plugin_name, $action, $blog->id, $updated, false, $network_wide);
                         if (!empty($inventory)) {
                             $data = array(
                                 'data' => $inventory
                             );
-                            $this->ss_client->sendInventory($data, true, $blog);
+                            $this->inplementMultisiteParams($blog->id, $data);
+                            $this->ss_client->sendInventory($data, true, $blog->domain);
                         }
                     }
                     $this->sliceQueue(self::STACKSIGHT_INVENTORY_QUEUE);
@@ -769,6 +770,20 @@ class WPStackSightPlugin {
             }
         } else{
             $this->sendInventory($plugin_name, true, $this->getBlogDomainForSdk(), $action);
+        }
+    }
+
+    private function inplementMultisiteParams($blog_id, &$data){
+        $blog_options = get_blog_option($blog_id, 'stacksight_opt');
+        if($blog_options && is_array($blog_options)){
+            if(isset($blog_options['_id']) && !empty($blog_options['_id'])){
+                $data['appId'] = $blog_options['_id'];
+            }
+        }
+        if($blog_options && is_array($blog_options)){
+            if(isset($blog_options['token']) && !empty($blog_options['token'])){
+                $data['token'] = $blog_options['token'];
+            }
         }
     }
 
@@ -883,6 +898,11 @@ class WPStackSightPlugin {
                         <a href="?page=stacksight&tab=debug_mode" class="nav-tab <?php echo $active_tab == 'debug_mode' ? 'nav-tab-active' : ''; ?>">Debug</a>
                     <?php endif;?>
                 </h2>
+                <?php
+                    if( $active_tab == 'general_settings' ) {
+                        $this->initSubSites();
+                    }
+                ?>
                 <form method="post" action="options.php">
                     <?php
                     if( $active_tab == 'general_settings' ) {
@@ -908,6 +928,9 @@ class WPStackSightPlugin {
                     }
                     if($active_tab != 'debug_mode')
                         submit_button();
+
+                    update_option('sts_error_notice', '');
+                    update_option('sts_success_notice', '');
                     ?>
                 </form>
 
@@ -916,9 +939,93 @@ class WPStackSightPlugin {
         <?php
     }
 
+    private function initSubsiteParamsAfterAddEvent($blog_id){
+        $blog = get_blog_details($blog_id);
+        $siteurl = get_blog_option($blog->blog_id, 'siteurl', false);
+        $blogname = get_blog_option($blog->blog_id, 'blogname', false);
+        $result_obj = array();
+        $result_obj['sites'][] = array(
+            'domain' => $blog->domain,
+            'host' => $siteurl,
+            'id' => $blog->blog_id,
+            'title' => $blogname
+        );
+        $apps_ids = $this->_sendInitSubsitesRequest($result_obj);
+        if($apps_ids){
+            $results = json_decode($apps_ids);
+            if(!isset($results->message)){
+                foreach($results as $key => $result){
+                    update_blog_option($key, 'stacksight_opt', array('_id' => $result, 'token' => STACKSIGHT_TOKEN));
+                }
+                return true;
+            } else{
+                return false;
+            }
+        }
+        return false;
+    }
+
+    public function init_all_subsites_admin_action()
+    {
+        global $wpdb;
+        if(!defined('STACKSIGHT_TOKEN')){
+            return new WP_Error('broke', __( "Need to set token"));
+            wp_redirect($_SERVER['HTTP_REFERER']);
+            exit();
+        }
+
+        update_option('sts_error_notice', '');
+        update_option('sts_success_notice', '');
+
+        $blogs = $wpdb->get_results( "SELECT * FROM $wpdb->blogs WHERE deleted = '0'");
+        $result = array();
+        foreach ($blogs as $blog){
+            $siteurl = get_blog_option($blog->blog_id, 'siteurl', false);
+            $blogname = get_blog_option($blog->blog_id, 'blogname', false);
+            $tmp = array(
+                'domain' => $blog->domain,
+                'host' => $siteurl,
+                'id' => $blog->blog_id,
+                'title' => $blogname
+            );
+            if(is_main_site($blog->blog_id)){
+                $tmp['type'] = 'main';
+            }
+            $result['sites'][] = $tmp;
+        }
+        $apps_ids = $this->_sendInitSubsitesRequest($result);
+        if($apps_ids){
+            $results = json_decode($apps_ids);
+            if(!isset($results->message)){
+                foreach($results as $key => $result){
+                    update_blog_option($key, 'stacksight_opt', array('_id' => $result, 'token' => STACKSIGHT_TOKEN));
+                }
+                update_option('sts_success_notice', 'Stacksight: Application IDs set success for all subsites.');
+            } else{
+                update_option('sts_error_notice', 'Stacksight error: '.$results->message);
+            }
+        }
+
+        wp_redirect($_SERVER['HTTP_REFERER']);
+    }
+
+    private function _sendInitSubsitesRequest($data){
+        $url = new SSHttpRequest();
+        $ch = curl_init($url->getInitIdsUrl('wordpress'));
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+        curl_setopt($ch, CURLOPT_FRESH_CONNECT, true);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+                'Content-Type: application/json',
+                'Authorization: ' .STACKSIGHT_TOKEN
+        ));
+        return curl_exec($ch);
+    }
+
     public function sends_all_data_admin_action()
     {
-        if(defined('STACKSIGHT_PRIVATE_KEY') && STACKSIGHT_PRIVATE_KEY){
+        if(defined('STACKSIGHT_TOKEN') && STACKSIGHT_TOKEN){
             $last_running_time = get_option(self::LAST_SENDS_ALL_DATA);
             if($last_running_time){
                 if(time() - $last_running_time < self::LAST_SENDS_ALL_DATA_TIME){
@@ -977,10 +1084,22 @@ class WPStackSightPlugin {
         }
     }
 
+    private function initSubSites(){
+        if(is_multisite() && is_main_site() && defined('STACKSIGHT_TOKEN')){
+            ?>
+            <div id="init-all-subsites">
+                <form method="POST" action="<?php echo admin_url( 'admin.php' ); ?>">
+                    <input type="hidden" name="action" value="init_all_subsites" />
+                    <input type="submit" class="button-primary" value="Set application IDs for all subsites"/>
+                </form>
+            </div>
+            <?php
+        }
+    }
+
     private function showDebugInfo()
     {
         if(is_multisite() && is_main_site()){
-
             $last_running_time = get_option(self::LAST_SENDS_ALL_DATA);
             $enabled = '';
             $title = 'Send data from all subsites';
@@ -1440,15 +1559,6 @@ class WPStackSightPlugin {
             'stacksight-set-admin' // Page
         );
 
-        $title = (defined('stacksight_logs_title')) ? stacksight_logs_title : 'Include Logs';
-        add_settings_field(
-            'include_logs',
-            $title,
-            array( $this, 'include_logs_callback' ),
-            'stacksight-set-features',
-            'setting_section_stacksight'
-        );
-
         $title = (defined('stacksight_health_title')) ? stacksight_health_title : 'Include Health';
         add_settings_field(
             'include_health',
@@ -1485,6 +1595,16 @@ class WPStackSightPlugin {
             'setting_section_stacksight'
         );
 
+
+        $title = (defined('stacksight_logs_title')) ? stacksight_logs_title : 'Include Logs (<i>Beta</i>)';
+        add_settings_field(
+            'include_logs',
+            $title,
+            array( $this, 'include_logs_callback' ),
+            'stacksight-set-features',
+            'setting_section_stacksight'
+        );
+
         add_settings_field(
             'slack_url',
             'Webhook incoming URL',
@@ -1509,18 +1629,16 @@ class WPStackSightPlugin {
             'setting_section_stacksight'
         );
 
-        if(defined('STACKSIGHT_PUBLIC_KEY')){
-            add_settings_field(
-                '_id',
-                'App ID',
-                array( $this, 'app_id_callback' ),
-                'stacksight-set-admin',
-                'setting_section_stacksight'
-            );
-        }
+        add_settings_field(
+            '_id',
+            'App ID',
+            array( $this, 'app_id_callback' ),
+            'stacksight-set-admin',
+            'setting_section_stacksight'
+        );
 
         $token_title = 'Access Token *';
-        if((defined('DOCS_URL') && DOCS_URL) && (!defined('STACKSIGHT_PRIVATE_KEY') || !STACKSIGHT_PRIVATE_KEY)){
+        if((defined('DOCS_URL') && DOCS_URL) && (!defined('STACKSIGHT_TOKEN') || !STACKSIGHT_TOKEN)){
             $token_title .= '<a href="'.DOCS_URL.'" class="howto" target="_blank">How to set?</a>';
         }
 
@@ -1528,14 +1646,6 @@ class WPStackSightPlugin {
             'token',
             $token_title,
             array( $this, 'token_callback' ),
-            'stacksight-set-admin',
-            'setting_section_stacksight'
-        );
-
-        add_settings_field(
-            'group',
-            'App Group',
-            array( $this, 'group_callback' ),
             'stacksight-set-admin',
             'setting_section_stacksight'
         );
@@ -1572,7 +1682,7 @@ class WPStackSightPlugin {
     {
         $new_input = array();
 
-        if(!defined('STACKSIGHT_PRIVATE_KEY')) add_settings_error('token', 'token', '"App Acces Token" can not be empty');
+        if(!defined('STACKSIGHT_TOKEN')) add_settings_error('token', 'token', '"App Acces Token" can not be empty');
 
         $any_errors = $this->any_form_errors();
         if($any_errors)  $this->show_errors();
@@ -1711,13 +1821,13 @@ class WPStackSightPlugin {
                 isset( $this->options['_id'] ) ? esc_attr( $this->options['_id']) : ''
             );
         } else{
-            if(!defined('STACKSIGHT_PUBLIC_KEY')){
+            if(!defined('STACKSIGHT_APP_ID')){
                 printf(
                     '<span class="pre-code-green"> Is calculated </span>'
                 );
             } else {
                 printf(
-                    '<span>'.STACKSIGHT_PUBLIC_KEY.'</span>'
+                    '<span>'.STACKSIGHT_APP_ID.'</span>'
                 );
             }
         }
@@ -1733,33 +1843,13 @@ class WPStackSightPlugin {
                 isset( $this->options['token'] ) ? esc_attr( $this->options['token']) : ''
             );
         } else{
-            if(!defined('STACKSIGHT_PRIVATE_KEY')){
+            if(!defined('STACKSIGHT_TOKEN')){
                 printf(
                     '<span class="pre-code-red"> Not set </span>'.$link
                 );
             } else {
                 printf(
-                    '<span>'.STACKSIGHT_PRIVATE_KEY.'</span><input type="hidden" name="stacksight_opt[token]" value="'.STACKSIGHT_PRIVATE_KEY.'">'
-                );
-            }
-        }
-    }
-
-    public function group_callback()
-    {
-        if(defined('STACKSIGHT_SETTINGS_IN_DB') && STACKSIGHT_SETTINGS_IN_DB === true){
-            printf(
-                '<input type="text" id="group" name="stacksight_opt[group]" value="%s" size="50" />',
-                isset( $this->options['group'] ) ? esc_attr( $this->options['group']) : ''
-            );
-        } else{
-            if(!defined('STACKSIGHT_GROUP')){
-                printf(
-                    '<span class="pre-code-red"> Not set </span>'
-                );
-            } else {
-                printf(
-                    '<span>'.STACKSIGHT_GROUP.'</span>'
+                    '<span>'.STACKSIGHT_TOKEN.'</span><input type="hidden" name="stacksight_opt[token]" value="'.STACKSIGHT_TOKEN.'">'
                 );
             }
         }
@@ -1842,7 +1932,20 @@ class WPStackSightPlugin {
      */
     public function show_errors()
     {
-        settings_errors();
+        $urngent_notices = get_option('sts_error_notice');
+        $norml_notices = get_option('sts_success_notice');
+
+        if($urngent_notices || $norml_notices){
+            if(!empty($urngent_notices)){
+                echo '<div class="error notice is-dismissible" id="message"><p>'.$urngent_notices.'</p></div>';
+            }
+
+            if(!empty($norml_notices)){
+                echo '<div class="updated notice is-dismissible" id="message"><p>'.$norml_notices.'</p></div>';
+            }
+        } else{
+            settings_errors();
+        }
     }
 
     /**
@@ -1886,7 +1989,7 @@ class WPStackSightPlugin {
         $list = array();
         $show_code = false;
 
-        if (!defined('STACKSIGHT_PRIVATE_KEY')) {
+        if (!defined('STACKSIGHT_TOKEN')) {
             $list[] = __('Token doesn\'t exist', 'stacksight').'<br>';
             $show_code = true;
         }
@@ -1992,27 +2095,31 @@ class WPStackSightPlugin {
             $sql = "SELECT * FROM $table WHERE meta_key = 'last_login_time' AND user_id = ".$data[0]['user_id']." ORDER BY meta_value DESC LIMIT 1";
             $login_date = $data[0]['login_date'];
         } else{
-            $sql = "SELECT * FROM $table WHERE meta_key = 'last_login_time' ORDER BY meta_value DESC LIMIT 1";
+            if(!is_multisite()){
+                $sql = "SELECT * FROM $table WHERE meta_key = 'last_login_time' ORDER BY meta_value DESC LIMIT 1";
+            }
         }
 
-        $meta = $wpdb->get_row($sql);
-        if (isset($meta->meta_value)){
-            $meta->meta_value = maybe_unserialize( $meta->meta_value );
-            if(isset($meta->user_id)){
-                $user_info = get_userdata($meta->user_id);
-                if($login_date === false){
-                    $login_time = strtotime($meta->meta_value);
-                } else{
-                    $login_time = strtotime($login_date);
+        if($sql){
+            $meta = $wpdb->get_row($sql);
+            if (isset($meta->meta_value)){
+                $meta->meta_value = maybe_unserialize( $meta->meta_value );
+                if(isset($meta->user_id)){
+                    $user_info = get_userdata($meta->user_id);
+                    if($login_date === false){
+                        $login_time = strtotime($meta->meta_value);
+                    } else{
+                        $login_time = strtotime($login_date);
+                    }
+                    $plugin_info['last_login'] = array(
+                        'user_id' => $meta->user_id,
+                        'user_login' => $user_info->user_login,
+                        'user_mail' => $user_info->user_email,
+                        'user_name' => $user_info->display_name,
+                        'user_link' => get_edit_user_link($meta->user_id),
+                        'time' => $login_time
+                    );
                 }
-                $plugin_info['last_login'] = array(
-                    'user_id' => $meta->user_id,
-                    'user_login' => $user_info->user_login,
-                    'user_mail' => $user_info->user_email,
-                    'user_name' => $user_info->display_name,
-                    'user_link' => get_edit_user_link($meta->user_id),
-                    'time' => $login_time
-                );
             }
         }
 
@@ -2031,6 +2138,7 @@ class WPStackSightPlugin {
         }
 
         $user_owner = get_user_by_email($owner_mail);
+
         if($user_owner){
             $plugin_info['owner'] = array(
                 'user_id' => $user_owner->get('id'),
@@ -2044,9 +2152,8 @@ class WPStackSightPlugin {
         return array(
             'app' => $plugin_info,
             'settings' => array(
-                'app_id' => (defined('STACKSIGHT_PUBLIC_KEY')) ? STACKSIGHT_PUBLIC_KEY : false,
-                'app_token' => (defined('STACKSIGHT_PRIVATE_KEY')) ? STACKSIGHT_PRIVATE_KEY : false,
-                'app_group' => (defined('STACKSIGHT_GROUP')) ? STACKSIGHT_GROUP : false,
+                'app_id' => (defined('STACKSIGHT_APP_ID')) ? STACKSIGHT_APP_ID : false,
+                'app_token' => (defined('STACKSIGHT_TOKEN')) ? STACKSIGHT_TOKEN : false,
                 'debug_mode' => (defined('STACKSIGHT_DEBUG')) ? STACKSIGHT_DEBUG : false
             ),
             'features' => array(
