@@ -3,7 +3,7 @@
  * Plugin Name: Stacksight
  * Plugin URI: https://wordpress.org/plugins/stacksight/
  * Description: Stacksight wordpress support (featuring events, error logs and updates)
- * Version: 1.11.1
+ * Version: 1.11.2
  * Author: Stacksight LTD
  * Author URI: http://stacksight.io
  * License: GPL
@@ -435,10 +435,10 @@ class WPStackSightPlugin {
     {
         if($network_wide == true && is_multisite()){
             if(is_plugin_active_for_network($plugin) && in_array($plugin, (array) get_blog_option($blog_id, 'active_plugins', array()))){
-                return false;
+                return true;
             }
             if(!is_plugin_active_for_network($plugin) && in_array($plugin, (array) get_blog_option($blog_id, 'active_plugins', array()))){
-                return false;
+                return true;
             }
             if(is_plugin_active_for_network($plugin) && !in_array($plugin, (array) get_blog_option($blog_id, 'active_plugins', array()))){
                 return true;
@@ -448,7 +448,7 @@ class WPStackSightPlugin {
             }
         } else{
             if(is_plugin_active_for_network($plugin) && in_array($plugin, (array) get_option('active_plugins', array()))){
-                return false;
+                return true;
             }
             if(!is_plugin_active_for_network($plugin) && in_array($plugin, (array) get_option('active_plugins', array()))){
                 return true;
@@ -835,9 +835,9 @@ class WPStackSightPlugin {
                 if(!isset($active)){
                     if(is_multisite()){
                         if($blog_id){
-                            $active = $this->is_blog_plugin_active($path, $blog_id);
+                            $active = $this->is_blog_plugin_active($path, $blog_id, true);
                         } else{
-                            $active = $this->is_blog_plugin_active($path, get_current_blog_id());
+                            $active = $this->is_blog_plugin_active($path, get_current_blog_id(), true);
                         }
                     } else{
                         $active = is_plugin_active($path);
@@ -858,7 +858,14 @@ class WPStackSightPlugin {
             }
         }
 
-        $current_theme = get_current_theme();
+        $current_blog_id = get_current_blog_id();
+        $theme_info = '';
+        $current_theme = '';
+        if(!is_multisite() || (is_multisite() && $blog_id && $blog_id == $current_blog_id)){
+            $current_theme = get_current_theme();
+        } elseif($blog_id){
+            $current_theme = get_blog_option($blog_id, 'current_theme', array());
+        }
         if($object_themes && is_array($object_themes)){
             foreach($object_themes as $theme_name => $theme){
                 $themes[] = array(
@@ -873,6 +880,7 @@ class WPStackSightPlugin {
                 );
             }
         }
+        
         return array_merge($themes, $plugins);
     }
 
